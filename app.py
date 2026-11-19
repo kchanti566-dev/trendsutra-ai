@@ -1,7 +1,7 @@
 import re
 import time
+from google import genai
 from googleapiclient.discovery import build
-import google.generativeai as genai
 import requests
 import streamlit as st
 
@@ -14,7 +14,6 @@ st.write(
     " మార్గాలను AI చెప్తుంది!"
 )
 
-# API కీలు Streamlit Secrets నుండి రహస్యంగా వస్తాయి
 GEMINI_KEY = st.secrets["GEMINI_API_KEY"]
 YOUTUBE_KEY = st.secrets["YOUTUBE_API_KEY"]
 RAPIDAPI_KEY = st.secrets["RAPIDAPI_API_KEY"]
@@ -25,7 +24,7 @@ output_lang = st.selectbox(
 
 
 def extract_video_id(url):
-  pattern = r"(?:v=|\/)([0-9A-Za-z_-]{11}).*"
+  pattern = r"(?:v=|\/|live\/)([0-9A-Za-z_-]{11}).*"
   match = re.search(pattern, url)
   return match.group(1) if match else None
 
@@ -37,8 +36,8 @@ def get_youtube_data(video_id):
   )
   if not vid_response["items"]:
     return None, None
-  snippet = vid_response["items"][0]["snippet"]
-  stats = vid_response["items"][0]["statistics"]
+  snippet = vid_response["items"]["snippet"]
+  stats = vid_response["items"]["statistics"]
   video_info = {
       "title": snippet["title"],
       "description": snippet["description"][:1000],
@@ -70,7 +69,7 @@ def get_youtube_data(video_id):
 
 
 def generate_ai_report(platform, data_text, lang):
-  genai.configure(api_key=GEMINI_KEY)
+  client = genai.Client(api_key=GEMINI_KEY)
   prompt = f"""
     నువ్వు ఒక టాప్ {platform} గ్రోత్ మరియు వైరల్ కంటెంట్ స్ట్రాటజిస్ట్‌వి.
     క్రింది వీడియో డేటా మరియు కామెంట్లను లోతుగా విశ్లేషించి, {lang} భాషలో A to Z గ్రోత్ రిపోర్ట్ తయారు చెయ్యి:
@@ -83,22 +82,16 @@ def generate_ai_report(platform, data_text, lang):
     4. 🔍 SEO, క్యాప్షన్ & హ్యాష్‌ట్యాగ్ మెరుగుదలలు
     5. 🚀 ఎంగేజ్‌మెంట్ పెంచే ప్రో-టిప్
     """
-  models_to_try = [
-      "gemini-2.5-flash-lite",
-      "gemini-3.8-flash",
-      "gemini-2.0-flash-lite",
-  ]
-  for attempt in range(2):
-    for model_name in models_to_try:
-      try:
-        model = genai.GenerativeModel(model_name)
-        return model.generate_content(prompt).text
-      except Exception:
-        continue
-    if attempt == 0:
-      st.info("⏳ సర్వర్ బిజీగా ఉంది, 20 సెకన్లు వేచి ఉండి మళ్ళీ ప్రయత్నిస్తోంది...")
-      time.sleep(20)
-  return "⚠️ ప్రస్తుతం ఎక్కువ మంది యూజర్లు వాడుతున్నారు. దయచేసి కొద్దిసేపటి తర్వాత ప్రయత్నించండి."
+  for model_name in ["gemini-2.5-flash", "gemini-2.5-flash-lite"]:
+    try:
+      response = client.models.generate_content(
+          model=model_name, contents=prompt
+      )
+      return response.text
+    except Exception as e:
+      last_error = str(e)
+      continue
+  return f"⚠️ API పరిమితి లేదా లోపం: {last_error}"
 
 
 tab1, tab2, tab3 = st.tabs(["🎬 YouTube", "📱 Instagram Reels", "🎵 TikTok"])
