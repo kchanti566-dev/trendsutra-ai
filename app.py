@@ -36,8 +36,8 @@ def get_youtube_data(video_id):
   )
   if not vid_response["items"]:
     return None, None
-  snippet = vid_response["items"]["snippet"]
-  stats = vid_response["items"]["statistics"]
+  snippet = vid_response["items"][0]["snippet"]
+  stats = vid_response["items"][0]["statistics"]
   video_info = {
       "title": snippet["title"],
       "description": snippet["description"][:1000],
