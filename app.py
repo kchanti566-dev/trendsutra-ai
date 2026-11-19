@@ -14,7 +14,11 @@ st.write(
     " మార్గాలను AI చెప్తుంది!"
 )
 
-GEMINI_KEY = st.secrets["GEMINI_API_KEY"]
+# రెండు Gemini API కీలు (ఒకటి అయిపోతే రెండోది ఆటోమేటిక్‌గా పనిచేస్తుంది)
+GEMINI_KEYS = [
+    st.secrets["GEMINI_API_KEY"],
+    st.secrets["GEMINI_API_KEY_2"],
+]
 YOUTUBE_KEY = st.secrets["YOUTUBE_API_KEY"]
 RAPIDAPI_KEY = st.secrets["RAPIDAPI_API_KEY"]
 
@@ -69,7 +73,6 @@ def get_youtube_data(video_id):
 
 
 def generate_ai_report(platform, data_text, lang):
-  client = genai.Client(api_key=GEMINI_KEY)
   prompt = f"""
     నువ్వు ఒక టాప్ {platform} గ్రోత్ మరియు వైరల్ కంటెంట్ స్ట్రాటజిస్ట్‌వి.
     క్రింది వీడియో డేటా మరియు కామెంట్లను లోతుగా విశ్లేషించి, {lang} భాషలో A to Z గ్రోత్ రిపోర్ట్ తయారు చెయ్యి:
@@ -82,16 +85,19 @@ def generate_ai_report(platform, data_text, lang):
     4. 🔍 SEO, క్యాప్షన్ & హ్యాష్‌ట్యాగ్ మెరుగుదలలు
     5. 🚀 ఎంగేజ్‌మెంట్ పెంచే ప్రో-టిప్
     """
-  for model_name in ["gemini-3.5-flash-lite", "gemini-3.8-flash"]:
-    try:
-      response = client.models.generate_content(
-          model=model_name, contents=prompt
-      )
-      return response.text
-    except Exception as e:
-      last_error = str(e)
-      continue
-  return f"⚠️ API పరిమితి లేదా లోపం: {last_error}"
+  last_error = ""
+  for key in GEMINI_KEYS:
+    client = genai.Client(api_key=key)
+    for model_name in ["gemini-3.5-flash-lite", "gemini-3.8-flash"]:
+      try:
+        response = client.models.generate_content(
+            model=model_name, contents=prompt
+        )
+        return response.text
+      except Exception as e:
+        last_error = str(e)
+        continue
+  return f"⚠️ అన్ని API కీల పరిమితి పూర్తయింది: {last_error}"
 
 
 tab1, tab2, tab3 = st.tabs(["🎬 YouTube", "📱 Instagram Reels", "🎵 TikTok"])
