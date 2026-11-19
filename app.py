@@ -82,7 +82,7 @@ def generate_ai_report(platform, data_text, lang):
     4. 🔍 SEO, క్యాప్షన్ & హ్యాష్‌ట్యాగ్ మెరుగుదలలు
     5. 🚀 ఎంగేజ్‌మెంట్ పెంచే ప్రో-టిప్
     """
-  for model_name in ["gemini-2.5-flash", "gemini-2.5-flash-lite"]:
+  for model_name in ["gemini-3.5-flash-lite", "gemini-3.8-flash"]:
     try:
       response = client.models.generate_content(
           model=model_name, contents=prompt
