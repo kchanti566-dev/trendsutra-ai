@@ -1,26 +1,40 @@
 import re
-import time
+from fpdf import FPDF
 from google import genai
 from googleapiclient.discovery import build
-import requests
 import streamlit as st
 
 st.set_page_config(
-    page_title="CreatorPulse AI - Growth Analyzer", page_icon="🚀", layout="wide"
-)
-st.title("🚀 YouTube, Instagram & TikTok AI (A to Z Growth Analyzer)")
-st.write(
-    "ఏదైనా వీడియో లింక్ ఇవ్వండి—ప్రేక్షకుల నాడి, వైరల్ ఐడియాలు, మరియు ఆదాయ"
-    " మార్గాలను AI చెప్తుంది!"
+    page_title="CreatorPulse by AIENGTEL - Free AI Growth Analyzer",
+    page_icon="🚀",
+    layout="wide",
 )
 
-# రెండు Gemini API కీలు (ఒకటి అయిపోతే రెండోది ఆటోమేటిక్‌గా పనిచేస్తుంది)
+with st.sidebar:
+  st.image("https://icons8.com", width=60)
+  st.title("CreatorPulse AI")
+  st.caption("Powered by **AIENGTEL.com**")
+  st.divider()
+  st.success("🎉 **Limited Time Free Launch!**")
+  st.write(
+      "✅ పూర్తి 5-స్టెప్ A-to-Z గ్రోత్ రిపోర్ట్\n✅ ఆదాయ మార్గాలు & SEO"
+      " సీక్రెట్స్\n✅ ఉచిత PDF డౌన్‌లోడ్"
+  )
+  st.divider()
+  st.markdown("🌐 [Explore AI Tools on AIENGTEL](https://aiengtel.com)")
+
+st.title("🚀 CreatorPulse by AIENGTEL")
+st.subheader("YouTube, Instagram & TikTok (A to Z Growth Analyzer)")
+st.write(
+    "ఏదైనా వీడియో లింక్ ఇవ్వండి—ప్రేక్షకుల నాడి, వైరల్ ఐడియాలు, మరియు ఆదాయ"
+    " మార్గాలను AI ఉచితంగా విశ్లేషిస్తుంది!"
+)
+
 GEMINI_KEYS = [
     st.secrets["GEMINI_API_KEY"],
     st.secrets["GEMINI_API_KEY_2"],
 ]
 YOUTUBE_KEY = st.secrets["YOUTUBE_API_KEY"]
-RAPIDAPI_KEY = st.secrets["RAPIDAPI_API_KEY"]
 
 output_lang = st.selectbox(
     "రిపోర్ట్ ఏ భాషలో కావాలి?", ["Telugu (తెలుగు)", "Tenglish", "English"]
@@ -28,7 +42,7 @@ output_lang = st.selectbox(
 
 
 def extract_video_id(url):
-  pattern = r"(?:v=|\/|live\/)([0-9A-Za-z_-]{11}).*"
+  pattern = r"(?:v=|\/|live\/|shorts\/)([0-9A-Za-z_-]{11}).*"
   match = re.search(pattern, url)
   return match.group(1) if match else None
 
@@ -88,7 +102,7 @@ def generate_ai_report(platform, data_text, lang):
   last_error = ""
   for key in GEMINI_KEYS:
     client = genai.Client(api_key=key)
-    for model_name in ["gemini-3.5-flash-lite", "gemini-3.8-flash"]:
+    for model_name in ["gemini-2.5-flash", "gemini-2.5-flash-lite"]:
       try:
         response = client.models.generate_content(
             model=model_name, contents=prompt
@@ -100,11 +114,30 @@ def generate_ai_report(platform, data_text, lang):
   return f"⚠️ అన్ని API కీల పరిమితి పూర్తయింది: {last_error}"
 
 
+def create_pdf(report_text):
+  pdf = FPDF()
+  pdf.add_page()
+  pdf.set_font("Arial", size=11)
+  clean_text = report_text.encode("latin-1", "replace").decode("latin-1")
+  pdf.multi_cell(0, 8, txt=clean_text)
+  return bytes(pdf.output())
+
+
+def display_full_report(report_text):
+  st.markdown(report_text)
+  st.download_button(
+      label="📥 Download Full Report (PDF)",
+      data=create_pdf(report_text),
+      file_name="CreatorPulse_Growth_Report.pdf",
+      mime="application/pdf",
+  )
+
+
 tab1, tab2, tab3 = st.tabs(["🎬 YouTube", "📱 Instagram Reels", "🎵 TikTok"])
 
 with tab1:
   yt_url = st.text_input(
-      "🔗 YouTube వీడియో లింక్:", placeholder="https://youtu.be..."
+      "🔗 YouTube వీడియో లేదా Shorts లింక్:", placeholder="https://youtu.be..."
   )
   if st.button("🚀 YouTube విశ్లేషణ ప్రారంభించు"):
     if not yt_url:
@@ -127,64 +160,40 @@ with tab1:
                 f" {info['description']}\nTags: {info['tags']}\nComments:"
                 f" {comments}"
             )
-            st.markdown(generate_ai_report("YouTube", raw_data, output_lang))
+            report = generate_ai_report("YouTube", raw_data, output_lang)
+            display_full_report(report)
 
 with tab2:
   insta_url = st.text_input(
       "🔗 Instagram Reel లింక్:", placeholder="https://instagram.com..."
   )
+  insta_caption = st.text_area(
+      "📝 Reel క్యాప్షన్ / వివరాలు (ఐచ్ఛికం - మంచి ఫలితాల కోసం):",
+      height=80,
+  )
   if st.button("🔥 Instagram Reel విశ్లేషణ ప్రారంభించు"):
     if not insta_url:
       st.error("దయచేసి Instagram Reel లింక్ ఇవ్వండి.")
     else:
-      with st.spinner("Instagram డేటా సేకరిస్తోంది..."):
-        fetched_text = f"Reel Link: {insta_url}\n"
-        try:
-          api_url = "https://rapidapi.com"
-          headers = {
-              "x-rapidapi-key": RAPIDAPI_KEY,
-              "x-rapidapi-host": (
-                  "://rapidapi.com"
-              ),
-          }
-          res = requests.get(
-              api_url,
-              headers=headers,
-              params={"reel_post_code_or_url": insta_url},
-              timeout=15,
-          )
-          if res.status_code == 200:
-            fetched_text += f"API Data: {str(res.json())[:3500]}"
-        except Exception:
-          pass
       with st.spinner("AI Instagram రిపోర్ట్ తయారు చేస్తోంది..."):
-        st.markdown(
-            generate_ai_report("Instagram Reels", fetched_text, output_lang)
+        fetched_text = f"Reel Link: {insta_url}\nCaption: {insta_caption}"
+        report = generate_ai_report(
+            "Instagram Reels", fetched_text, output_lang
         )
+        display_full_report(report)
 
 with tab3:
   tiktok_url = st.text_input(
-      "🔗 TikTok వీడియో లింక్:",
-      placeholder="https://tiktok.com...",
+      "🔗 TikTok వీడియో లింక్:", placeholder="https://tiktok.com..."
+  )
+  tt_caption = st.text_area(
+      "📝 TikTok క్యాప్షన్ / వివరాలు (ఐచ్ఛికం):", height=80
   )
   if st.button("🎵 TikTok విశ్లేషణ ప్రారంభించు"):
     if not tiktok_url:
       st.error("దయచేసి TikTok లింక్ ఇవ్వండి.")
     else:
-      with st.spinner("TikTok డేటా సేకరిస్తోంది..."):
-        fetched_tt = f"TikTok Link: {tiktok_url}\n"
-        try:
-          tt_api = "https://rapidapi.com"
-          headers = {
-              "x-rapidapi-key": RAPIDAPI_KEY,
-              "x-rapidapi-host": "://rapidapi.com",
-          }
-          res = requests.get(
-              tt_api, headers=headers, params={"url": tiktok_url}, timeout=15
-          )
-          if res.status_code == 200:
-            fetched_tt += f"API Data: {str(res.json())[:3500]}"
-        except Exception:
-          pass
       with st.spinner("AI TikTok రిపోర్ట్ తయారు చేస్తోంది..."):
-        st.markdown(generate_ai_report("TikTok", fetched_tt, output_lang))
+        fetched_tt = f"TikTok Link: {tiktok_url}\nCaption: {tt_caption}"
+        report = generate_ai_report("TikTok", fetched_tt, output_lang)
+        display_full_report(report)
