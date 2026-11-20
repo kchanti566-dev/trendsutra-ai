@@ -37,6 +37,20 @@ def extract_video_id(text: str):
     return None
 
 
+def _extract_output_text(res) -> str:
+    if not res:
+        return ""
+    if getattr(res, "text", None) and str(res.text).strip():
+        return str(res.text).strip()
+    outputs = getattr(res, "outputs", None) or []
+    parts = []
+    for item in outputs:
+        t = getattr(item, "text", None)
+        if t:
+            parts.append(str(t))
+    return "\n".join(parts).strip()
+
+
 def generate_with_rotation(prompt: str) -> str:
     keys = get_gemini_keys()
     if not keys:
@@ -45,38 +59,76 @@ def generate_with_rotation(prompt: str) -> str:
     if "gemini_key_idx" not in st.session_state:
         st.session_state.gemini_key_idx = 0
 
-    models_to_try = ["gemini-3.8-flash", "gemini-2.5-flash"]
     total = len(keys)
-    last_error = None
+    errors = []
 
     for attempt in range(total):
         idx = (st.session_state.gemini_key_idx + attempt) % total
         api_key = keys[idx]
-        for model_name in models_to_try:
+        try:
+            client = genai.Client(
+                api_key=api_key,
+                http_options=types.HttpOptions(timeout=15000),
+            )
+
+            # 1) Try Interactions API with gemini-3.8-flash
             try:
-                client = genai.Client(
-                    api_key=api_key,
-                    http_options=types.HttpOptions(timeout=15000),
+                inter = client.interactions.create(
+                    model="gemini-3.8-flash",
+                    input=prompt,
                 )
-                response = client.models.generate_content(
-                    model=model_name,
+                out = _extract_output_text(inter)
+                if out:
+                    st.session_state.gemini_key_idx = (idx + 1) % total
+                    return out
+            except Exception as e_inter:
+                errors.append(f"Key#{idx+1} [interactions gemini-3.8-flash]: {e_inter}")
+
+            # 2) Try generate_content with gemini-3.8-flash
+            try:
+                resp = client.models.generate_content(
+                    model="gemini-3.8-flash",
                     contents=prompt,
                 )
-                text = getattr(response, "text", None)
-                if text and text.strip():
+                out = _extract_output_text(resp)
+                if out:
                     st.session_state.gemini_key_idx = (idx + 1) % total
-                    return text
-            except Exception as e:
-                last_error = f"[{model_name}] {str(e)}"
-                continue
+                    return out
+            except Exception as e_gc:
+                errors.append(f"Key#{idx+1} [generate_content gemini-3.8-flash]: {e_gc}")
 
-    return f"❌ రిపోర్ట్ జనరేట్ కాలేదు. చివరి లోపం: {last_error}"
+            # 3) Auto-discover first available flash model for this key
+            try:
+                avail_models = []
+                for m in client.models.list():
+                    m_name = getattr(m, "name", "")
+                    if "flash" in m_name.lower():
+                        avail_models.append(m_name)
+                for m_name in avail_models[:2]:
+                    try:
+                        resp_m = client.models.generate_content(
+                            model=m_name,
+                            contents=prompt,
+                        )
+                        out_m = _extract_output_text(resp_m)
+                        if out_m:
+                            st.session_state.gemini_key_idx = (idx + 1) % total
+                            return out_m
+                    except Exception as e_m:
+                        errors.append(f"Key#{idx+1} [{m_name}]: {e_m}")
+            except Exception as e_list:
+                errors.append(f"Key#{idx+1} [models.list]: {e_list}")
+
+        except Exception as e_client:
+            errors.append(f"Key#{idx+1} [client]: {e_client}")
+
+    return "❌ రిపోర్ట్ జనరేట్ కాలేదు. వివరాలు:\n- " + "\n- ".join(errors[-4:])
 
 
 def fetch_youtube_stats(user_input: str) -> str:
     yt_key = st.secrets.get("YOUTUBE_API_KEY", "")
     if not yt_key:
-        return f"YouTube Input: {user_input} (API Key లేకపోయినా ఇన్‌పుట్ ఆధారంగా విశ్లేషించండి)"
+        return f"YouTube Input: {user_input}"
 
     vid_id = extract_video_id(user_input)
     try:
@@ -112,7 +164,7 @@ def fetch_youtube_stats(user_input: str) -> str:
         ).json()
         items = r.get("items", [])
         if not items:
-            return f"Input/Query: {user_input} (నేరుగా ఛానెల్ దొరకలేదు, నిచ్/కీవర్డ్ ఆధారంగా విశ్లేషించండి)"
+            return f"Input/Query: {user_input}"
 
         ch = items[0]
         ch_id = ch["id"]["channelId"]
