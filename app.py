@@ -1,4 +1,5 @@
 import re
+import time
 from google import genai
 from googleapiclient.discovery import build
 import requests
@@ -19,7 +20,7 @@ GEMINI_KEYS = [k for k in GEMINI_KEYS if k]
 YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY", "")
 RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "")
 
-# --- ఎడమ వైపు సైడ్‌బార్ (Left Sidebar) ---
+# --- ఎడమ వైపు సైడ్‌బార్ ---
 with st.sidebar:
   st.markdown("## 🌍 Global & Regional Settings")
   report_lang = st.selectbox(
@@ -42,7 +43,7 @@ with st.sidebar:
       " a limited time!"
   )
 
-# --- ప్రధాన పేజీ (Main Header) ---
+# --- ప్రధాన పేజీ ---
 st.markdown("# 🚀 TrendSutra AI")
 st.markdown(
     "**A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powered by"
@@ -54,7 +55,6 @@ st.info(
     " for free!"
 )
 
-# --- ఇన్‌పుట్ విభాగం (Platform & Link) ---
 col1, col2 = st.columns(2)
 with col1:
   platform = st.selectbox(
@@ -67,7 +67,6 @@ with col2:
   )
 
 
-# --- డేటా సేకరణ ఫంక్షన్లు ---
 def extract_youtube_id(url):
   pattern = r"(?:v=|\/|live\/|shorts\/)([0-9A-Za-z_-]{11}).*"
   match = re.search(pattern, url)
@@ -141,6 +140,7 @@ def fetch_rapidapi_safe(api_url, host, params, fallback_label):
     return f"{fallback_label} URL provided (Fetch note: {str(e)})."
 
 
+# 503 సర్వర్ బిజీ ఎర్రర్ వస్తే ఆటోమేటిక్‌గా మళ్ళీ ప్రయత్నించే ఫంక్షన్
 def generate_growth_report(platform_name, raw_data, lang, audience):
   prompt = f"""
     You are a {platform_name} Growth Strategist and Viral Content Architect for TrendSutra AI.
@@ -160,20 +160,34 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
     4. 🔍 **SEO, Caption & Hashtag Optimization:** Exact improvements to titles, descriptions, and discoverability tags.
     5. 🚀 **30-Day Growth Action Plan:** 3 immediate steps to double engagement and shares.
     """
+  models_list = [
+      "gemini-3.5-flash-lite",
+      "gemini-3.8-flash",
+      "gemini-2.5-flash",
+  ]
   last_err = ""
-  for key in GEMINI_KEYS:
-    client = genai.Client(api_key=key)
-    for model_name in ["gemini-3.5-flash-lite", "gemini-3.8-flash"]:
-      try:
-        resp = client.models.generate_content(model=model_name, contents=prompt)
-        return resp.text
-      except Exception as e:
-        last_err = str(e)
-        continue
-  return f"⚠️ AI సర్వర్ ప్రస్తుతం బిజీగా ఉంది. దయచేసి కొద్దిసేపటి తర్వాత ప్రయత్నించండి. ({last_err})"
+
+  for attempt in range(2):
+    for key in GEMINI_KEYS:
+      client = genai.Client(api_key=key)
+      for model_name in models_list:
+        try:
+          resp = client.models.generate_content(
+              model=model_name, contents=prompt
+          )
+          if resp and resp.text:
+            return True, resp.text
+        except Exception as e:
+          last_err = str(e)
+          time.sleep(1.5)
+          continue
+  return (
+      False,
+      "⚠️ AI సర్వర్ ప్రస్తుతం చాలా రద్దీగా ఉంది (High Demand). దయచేసి 5 సెకన్ల తర్వాత"
+      " మళ్ళీ క్లిక్ చేయండి.",
+  )
 
 
-# --- బటన్ స్టైలింగ్ (Red Generate Button + Green Download Button) ---
 st.markdown(
     """
 <style>
@@ -206,7 +220,6 @@ div.stDownloadButton > button:first-child:hover {
     unsafe_allow_html=True,
 )
 
-# రిపోర్ట్‌ను సెషన్‌లో సేవ్ చేయడానికి (డౌన్‌లోడ్ నొక్కినప్పుడు పేజీ రీసెట్ అవ్వకుండా ఉండటానికి)
 if "generated_report" not in st.session_state:
   st.session_state.generated_report = ""
 if "report_stats" not in st.session_state:
@@ -243,16 +256,20 @@ if st.button("Generate Accurate Growth Report 🔍"):
       st.error(f"⚠️ {stats_obj}")
     else:
       with st.spinner("TrendSutra AI లోతుగా విశ్లేషిస్తోంది..."):
-        report = generate_growth_report(
+        success, result_text = generate_growth_report(
             platform, data_text, report_lang, target_audience
         )
-        st.session_state.generated_report = report
-        st.session_state.report_stats = (
-            stats_obj if platform == "YouTube" else None
-        )
-        st.session_state.report_platform = platform
+        if success:
+          st.session_state.generated_report = result_text
+          st.session_state.report_stats = (
+              stats_obj if platform == "YouTube" else None
+          )
+          st.session_state.report_platform = platform
+        else:
+          st.session_state.generated_report = ""
+          st.error(result_text)
 
-# --- రిపోర్ట్ మరియు డౌన్‌లోడ్ బటన్ ప్రదర్శన ---
+# --- రిపోర్ట్ విజయవంతంగా వస్తేనే డౌన్‌లోడ్ బటన్ చూపిస్తుంది ---
 if st.session_state.generated_report:
   if isinstance(st.session_state.report_stats, dict):
     m1, m2, m3 = st.columns(3)
@@ -269,7 +286,6 @@ if st.session_state.generated_report:
 
   st.success("✅ Growth Audit Report సిద్ధమైంది!")
 
-  # ఆకుపచ్చ రంగు డౌన్‌లోడ్ బటన్
   file_content = (
       f"=== TrendSutra AI - {st.session_state.report_platform} Growth Audit"
       f" Report ===\nPowered by AIENGTEL.com\n\n{st.session_state.generated_report}"
