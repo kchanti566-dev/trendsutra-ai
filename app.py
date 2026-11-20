@@ -42,7 +42,6 @@ output_lang = st.selectbox(
 )
 
 
-# 1. YouTube Helpers
 def extract_youtube_id(url):
   pattern = r"(?:v=|\/|live\/|shorts\/)([0-9A-Za-z_-]{11}).*"
   match = re.search(pattern, url)
@@ -90,7 +89,6 @@ def get_youtube_data(video_id):
   }
 
 
-# 2. Instagram Helpers
 def extract_insta_code(url):
   pattern = r"(?:reel|p|tv)\/([A-Za-z0-9_-]+)"
   match = re.search(pattern, url)
@@ -111,9 +109,7 @@ def get_insta_data(media_code):
   return None
 
 
-# 3. TikTok Helpers
 def extract_tiktok_id(url):
-  # షార్ట్ లింక్ (://tiktok.com / ://tiktok.com) అయితే అసలు లింక్‌కు రీడైరెక్ట్ చేస్తుంది
   if "://tiktok.com" in url or "://tiktok.com" in url:
     try:
       r = requests.head(url, allow_redirects=True, timeout=10)
@@ -139,7 +135,6 @@ def get_tiktok_data(video_id):
   return None
 
 
-# 4. AI Report Generator (Global & Regional Level)
 def generate_ai_report(platform, data_text, lang):
   prompt = f"""
     నువ్వు ఒక వరల్డ్-క్లాస్ {platform} గ్రోత్ మరియు వైరల్ కంటెంట్ స్ట్రాటజిస్ట్‌వి.
@@ -156,13 +151,14 @@ def generate_ai_report(platform, data_text, lang):
     5. 🚀 ఎంగేజ్‌మెంట్ పెంచే ప్రో-టిప్
     """
   last_error = ""
+  models_list = [
+      "gemini-3.5-flash-lite",
+      "gemini-3.5-flash",
+      "gemini-3-flash-preview",
+  ]
   for key in GEMINI_KEYS:
     client = genai.Client(api_key=key)
-        for model_name in [
-        "gemini-3.5-flash-lite",
-        "gemini-3.5-flash",
-        "gemini-3-flash-preview",
-    ]:
+    for model_name in models_list:
       try:
         response = client.models.generate_content(
             model=model_name, contents=prompt
