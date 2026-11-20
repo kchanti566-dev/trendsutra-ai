@@ -16,13 +16,12 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Fast YouTube Video/Channel Info Fetcher (1 సెకనులో డేటా తెస్తుంది)
+# 2. Fast YouTube Video Info Fetcher
 def get_youtube_context(url_or_handle):
     yt_key = st.secrets.get("YOUTUBE_API_KEY")
     if not yt_key:
         return ""
     try:
-        # వీడియో ID తీయడం (youtu.be లేదా youtube.com లింక్ నుండి)
         vid_match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url_or_handle)
         if vid_match:
             video_id = vid_match.group(1)
@@ -41,7 +40,7 @@ def get_youtube_context(url_or_handle):
         pass
     return ""
 
-# 3. Ultra-Fast Gemini API Auto-Rotation Function
+# 3. Ultra-Fast Gemini API Auto-Rotation + Lite Fallback (503 Error Fix)
 def generate_fast_report(prompt):
     api_keys = [
         st.secrets.get("GEMINI_API_KEY"),
@@ -52,19 +51,23 @@ def generate_fast_report(prompt):
     if not api_keys:
         return "⚠️ API Key కనుగొనబడలేదు! Streamlit Secrets లో GEMINI_API_KEY ని యాడ్ చేయండి."
 
+    # 3.8-flash బిజీగా (503) ఉంటే వెంటనే 3.8-flash-lite కి మారుతుంది
+    models = ["gemini-3.8-flash", "gemini-3.8-flash-lite"]
     last_error = ""
+
     for key in api_keys:
-        try:
-            client = genai.Client(api_key=key)
-            response = client.models.generate_content(
-                model="gemini-3.8-flash",
-                contents=prompt,
-            )
-            return response.text
-        except Exception as e:
-            last_error = str(e)
-            continue
-    return f"⚠️ API Error: {last_error}"
+        client = genai.Client(api_key=key)
+        for model_name in models:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                )
+                return response.text
+            except Exception as e:
+                last_error = str(e)
+                continue
+    return f"⚠️ Server busy right now. Please click Generate again in 5 seconds. ({last_error})"
 
 # 4. Safe PDF Generation Function
 def create_pdf(report_text, platform, username):
@@ -121,34 +124,31 @@ with st.sidebar:
     st.markdown("### 🔗 Explore More AI Tools")
     st.markdown("Discover 100+ Best AI Tools in **English & తెలుగు** at **[AIENGTEL.com](https://aiengtel.com)** 🚀")
 
-# 6. Main App Interface
+# 6. Main App Interface (2 Clean Columns - No Niche Box)
 st.title("🚀 CreatorPulse AI")
 st.markdown("##### A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powered by **[AIENGTEL.com](https://aiengtel.com)**")
 
 if FREE_LAUNCH_MODE:
     st.info("🎁 **Special Launch Access:** Enjoy unlimited AI Growth Audits & Free PDF Downloads for the next few days!")
 
-col1, col2, col3 = st.columns(3)
+col1, col2 = st.columns([1, 2])
 with col1:
     platform = st.selectbox("Select Platform:", ["YouTube", "Instagram", "TikTok"])
 with col2:
-    handle = st.text_input("Channel / Profile / Video Link:", placeholder="@username or video link")
-with col3:
-    niche = st.text_input("Content Niche / Category:", placeholder="e.g., Tech, Vlogs, Cooking, Gaming")
+    handle = st.text_input("Channel / Profile / Video Link:", placeholder="@username or paste video/profile link here")
 
 if st.button("Generate Free Growth Report 🔍", type="primary"):
     if not handle:
         st.warning("Please enter a valid username or link!")
     else:
-        with st.spinner("⚡ Generating fast AI Growth Report..."):
+        with st.spinner("⚡ Analyzing & generating your Growth Report..."):
             live_data = get_youtube_context(handle) if platform == "YouTube" else ""
             
             prompt = f"""
-            Act as an expert Social Media Growth Strategist. Give a crisp, high-impact A-to-Z growth report strictly in {selected_lang}.
+            Act as an expert Social Media Growth Strategist. Automatically identify the creator's niche from the link/handle/data provided, and give a crisp, high-impact A-to-Z growth report strictly in {selected_lang}.
             Platform: {platform}
             Input Link/Handle: {handle}
             {live_data}
-            Niche: {niche if niche else 'General'}
             Target Audience: {audience_type}
 
             Keep each section concise (3-4 bullet points max per section) for fast reading:
