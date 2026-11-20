@@ -14,52 +14,27 @@ st.set_page_config(
 )
 
 def get_youtube_real_data(url_or_handle):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9"
-    }
-
+    headers = {"User-Agent": "Mozilla/5.0"}
     vid_match = re.search(r"(?:v=|youtu\.be\/|shorts\/|live\/)([0-9A-Za-z_-]{11})", url_or_handle)
     if vid_match:
         video_id = vid_match.group(1)
         try:
-            page = requests.get(f"https://youtube.com{video_id}", headers=headers, timeout=8)
+            parts = ["https://", "://youtube.com", "/watch?v=", video_id]
+            page = requests.get("".join(parts), headers=headers, timeout=8)
             html = page.text
-            title_m = re.search(r'<meta name="title" content="(.*?)">', html)
-            desc_m = re.search(r'<meta name="description" content="(.*?)">', html)
-            kw_m = re.search(r'<meta name="keywords" content="(.*?)">', html)
-            
-            title = title_m.group(1) if title_m else ""
-            if not title:
-                t2 = re.search(r"<title>(.*?)</title>", html)
-                title = t2.group(1).replace(" - YouTube", "").strip() if t2 else ""
-
+            t_match = re.search(r"<title>(.*?)</title>", html)
+            title = t_match.group(1).replace(" - YouTube", "").strip() if t_match else ""
             if title and title != "YouTube":
-                desc = desc_m.group(1)[:300] if desc_m else "N/A"
-                kws = kw_m.group(1)[:200] if kw_m else "N/A"
-                data_summary = f"Type: YouTube Video | Exact Video Title: {title} | Description: {desc} | Keywords: {kws}"
-                return data_summary, f"🎥 **{title}**"
+                return f"YouTube Video Title: {title}", f"🎥 **{title}**"
         except Exception as e:
             return None, f"⚠️ Error: {str(e)}"
+    return None, "⚠️ దయచేసి సరైన పబ్లిక్ YouTube వీడియో లింక్ ఇవ్వండి."
 
-    handle_match = re.search(r"@([0-9A-Za-z_.-]+)", url_or_handle)
-    if handle_match:
-        handle_name = "@" + handle_match.group(1)
-        try:
-            page = requests.get(f"https://youtube.com{handle_name}", headers=headers, timeout=8)
-            title_m = re.search(r'<meta property="og:title" content="(.*?)">', page.text)
-            desc_m = re.search(r'<meta property="og:description" content="(.*?)">', page.text)
-            if title_m:
-                ch_title = title_m.group(1)
-                ch_desc = desc_m.group(1)[:300] if desc_m else ""
-                data_summary = f"Type: YouTube Channel | Channel Name: {ch_title} | Bio: {ch_desc}"
-                return data_summary, f"📺 **{ch_title}**"
-        except Exception as e:
-            return None, f"⚠️ Error: {str(e)}"
-
-    return None, "⚠️ దయచేసి సరైన పబ్లిక్ YouTube వీడియో లింక్ లేదా @ChannelHandle ఇవ్వండి."
 def generate_accurate_report(prompt):
-    api_keys = [str(st.secrets.get("GEMINI_API_KEY", "")).strip(), str(st.secrets.get("GEMINI_API_KEY_2", "")).strip()]
+    api_keys = [
+        str(st.secrets.get("GEMINI_API_KEY", "")).strip(),
+        str(st.secrets.get("GEMINI_API_KEY_2", "")).strip()
+    ]
     api_keys = [k for k in api_keys if k]
     if not api_keys:
         return "⚠️ API Key కనుగొనబడలేదు! Streamlit Secrets లో GEMINI_API_KEY ని యాడ్ చేయండి."
@@ -92,8 +67,14 @@ def generate_accurate_report(prompt):
 
 with st.sidebar:
     st.title("🌍 Global & Regional Settings")
-    selected_lang = st.selectbox("Report Language / భాషను ఎంచుకోండి:", ["English (Global)", "Telugu (తెలుగు)", "Hindi (हिंदी)", "Tamil (தமிழ்)", "Kannada (ಕನ್ನಡ)", "Malayalam (മലയാളം)", "Spanish (Español)"])
-    audience_type = st.radio("Target Audience / ఆడియన్స్ రకం:", ["Regional / Local Audience", "Global / International Audience", "Both (Global + Regional)"])
+    selected_lang = st.selectbox(
+        "Report Language / భాషను ఎంచుకోండి:",
+        ["English (Global)", "Telugu (తెలుగు)", "Hindi (हिंदी)", "Tamil (தமிழ்)", "Kannada (ಕನ್ನಡ)", "Malayalam (മലയാളം)", "Spanish (Español)"]
+    )
+    audience_type = st.radio(
+        "Target Audience / ఆడియన్స్ రకం:",
+        ["Regional / Local Audience", "Global / International Audience", "Both (Global + Regional)"]
+    )
     st.divider()
     if FREE_LAUNCH_MODE:
         st.success("🎉 **FREE LAUNCH OFFER!**\nUnlimited Deep AI Audits are 100% FREE for a limited time!")
@@ -118,7 +99,7 @@ col1, col2 = st.columns(2)
 with col1:
     platform = st.selectbox("Select Platform:", ["YouTube", "Instagram", "TikTok"])
 with col2:
-    handle = st.text_input("Channel / Profile / Video Link:", placeholder="Paste YouTube video/channel link or @username")
+    handle = st.text_input("Channel / Profile / Video Link:", placeholder="Paste YouTube video link or @username")
 
 if st.button("Generate Accurate Growth Report 🔍", type="primary"):
     if not handle:
