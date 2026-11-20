@@ -5,50 +5,68 @@ import re
 import time
 
 # ==========================================
-# ⚙️ LAUNCH SETTINGS
+# ⚙️ APP BRANDING & LAUNCH SETTINGS
 # ==========================================
-FREE_LAUNCH_MODE = True  # కొన్ని రోజుల తర్వాత False చేస్తే Pro Plan ఆన్ అవుతుంది
+APP_NAME = "ReachCraft AI"  # మీకు నచ్చితే TrendSutra AI లేదా ViralVeda AI అని మార్చుకోవచ్చు
+FREE_LAUNCH_MODE = True
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="CreatorPulse AI by AIENGTEL - Global & Regional Growth Analyzer",
+    page_title=f"{APP_NAME} by AIENGTEL - Global & Regional Growth Analyzer",
     page_icon="🚀",
     layout="wide"
 )
 
-# 2. Accurate YouTube Video & Channel Data Fetcher
+# 2. Bulletproof YouTube Video & Channel Data Fetcher
 def get_youtube_real_data(url_or_handle):
-    yt_key = st.secrets.get("YOUTUBE_API_KEY")
-    if not yt_key:
-        return None, "⚠️ YouTube API Key missing in Streamlit Secrets."
+    yt_key = st.secrets.get("YOUTUBE_API_KEY", "").strip()
     
+    # కీలో పొరపాటున URL కలిసిపోయి ఉంటే కేవలం AIza... భాగాన్ని మాత్రమే తీసుకుంటుంది
+    key_match = re.search(r"(AIza[0-9A-Za-z_-]{35})", yt_key)
+    clean_yt_key = key_match.group(1) if key_match else ""
+
     try:
-        # 1. ముందుగా వీడియో లింక్ (youtu.be/xyz లేదా ://youtube.com లేదా shorts/xyz) చెక్ చేస్తుంది
+        # 1. వీడియో లింక్ చెక్ చేయడం
         vid_match = re.search(r"(?:v=|youtu\.be\/|shorts\/)([0-9A-Za-z_-]{11})", url_or_handle)
         if vid_match:
             video_id = vid_match.group(1)
-            api_url = f"https://googleapis.com{video_id}&key={yt_key}"
-            res = requests.get(api_url, timeout=5).json()
-            if res.get("items"):
-                item = res["items"]
-                snippet = item["snippet"]
-                stats = item["statistics"]
-                tags = ", ".join(snippet.get("tags", [])[:10])
+            
+            # ముందుగా YouTube Data API v3 ప్రయత్నిస్తుంది
+            if clean_yt_key:
+                api_url = f"https://googleapis.com{video_id}&key={clean_yt_key}"
+                res = requests.get(api_url, timeout=5).json()
+                if res.get("items"):
+                    item = res["items"]
+                    snippet = item["snippet"]
+                    stats = item["statistics"]
+                    tags = ", ".join(snippet.get("tags", [])[:10])
+                    data_summary = (
+                        f"Type: YouTube Video\n"
+                        f"Exact Video Title: {snippet.get('title')}\n"
+                        f"Channel Name: {snippet.get('channelTitle')}\n"
+                        f"Description Snippet: {snippet.get('description', '')[:300]}\n"
+                        f"Tags Used: {tags if tags else 'No tags'}\n"
+                        f"Views: {stats.get('viewCount', '0')} | Likes: {stats.get('likeCount', '0')} | Comments: {stats.get('commentCount', '0')}"
+                    )
+                    return data_summary, f"🎥 **{snippet.get('title')}** (Channel: {snippet.get('channelTitle')} | 👁️ {stats.get('viewCount', '0')} Views)"
+
+            # బ్యాకప్: API కీ పనిచేయకపోయినా YouTube oEmbed ద్వారా 100% అసలైన వీడియో టైటిల్ & ఛానల్ పేరు తెస్తుంది!
+            oembed_url = f"https://youtube.com{video_id}&format=json"
+            ores = requests.get(oembed_url, timeout=5)
+            if ores.status_code == 200:
+                odata = ores.json()
                 data_summary = (
                     f"Type: YouTube Video\n"
-                    f"Exact Video Title: {snippet.get('title')}\n"
-                    f"Channel Name: {snippet.get('channelTitle')}\n"
-                    f"Description Snippet: {snippet.get('description', '')[:300]}\n"
-                    f"Tags Used: {tags if tags else 'No tags'}\n"
-                    f"Views: {stats.get('viewCount', '0')} | Likes: {stats.get('likeCount', '0')} | Comments: {stats.get('commentCount', '0')}"
+                    f"Exact Video Title: {odata.get('title')}\n"
+                    f"Channel Name: {odata.get('author_name')}"
                 )
-                return data_summary, f"🎥 **{snippet.get('title')}** (Channel: {snippet.get('channelTitle')} | 👁️ {stats.get('viewCount', '0')} Views)"
+                return data_summary, f"🎥 **{odata.get('title')}** (Channel: {odata.get('author_name')})"
 
-        # 2. ఒకవేళ ఛానల్ హ్యాండిల్ (@username) ఇస్తే ఛానల్ డేటా తెస్తుంది
+        # 2. ఛానల్ హ్యాండిల్ (@username) చెక్ చేయడం
         handle_match = re.search(r"@([0-9A-Za-z_.-]+)", url_or_handle)
-        if handle_match:
+        if handle_match and clean_yt_key:
             handle_name = "@" + handle_match.group(1)
-            api_url = f"https://googleapis.com{handle_name}&key={yt_key}"
+            api_url = f"https://googleapis.com{handle_name}&key={clean_yt_key}"
             res = requests.get(api_url, timeout=5).json()
             if res.get("items"):
                 item = res["items"]
@@ -62,15 +80,15 @@ def get_youtube_real_data(url_or_handle):
                 )
                 return data_summary, f"📺 **{snippet.get('title')}** (👥 {stats.get('subscriberCount', 'Hidden')} Subscribers | 🎬 {stats.get('videoCount', '0')} Videos)"
 
-        return None, "⚠️ ఈ YouTube లింక్/హ్యాండిల్ నుండి డేటా దొరకలేదు. దయచేసి సరైన పూర్తి వీడియో లింక్ లేదా @ChannelHandle ఇవ్వండి."
+        return None, "⚠️ ఈ YouTube లింక్/హ్యాండిల్ నుండి డేటా దొరకలేదు. దయచేసి సరైన పూర్తి వీడియో లింక్ ఇవ్వండి."
     except Exception as e:
-        return None, f"⚠️ YouTube API Error: {str(e)}"
+        return None, f"⚠️ Error fetching data: {str(e)}"
 
 # 3. Smart Auto-Rotation Gemini Function
 def generate_accurate_report(prompt):
     api_keys = [
-        st.secrets.get("GEMINI_API_KEY"),
-        st.secrets.get("GEMINI_API_KEY_2")
+        st.secrets.get("GEMINI_API_KEY", "").strip(),
+        st.secrets.get("GEMINI_API_KEY_2", "").strip()
     ]
     api_keys = [k for k in api_keys if k]
     
@@ -152,8 +170,8 @@ with st.sidebar:
     st.markdown("### 🔗 Explore More AI Tools")
     st.markdown("Discover 100+ Best AI Tools in **English & తెలుగు** at **[AIENGTEL.com](https://aiengtel.com)** 🚀")
 
-# 5. Main App Interface (2 Clean Columns - No Niche Box, No PDF)
-st.title("🚀 CreatorPulse AI")
+# 5. Main App Interface
+st.title(f"🚀 {APP_NAME}")
 st.markdown("##### A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powered by **[AIENGTEL.com](https://aiengtel.com)**")
 
 if FREE_LAUNCH_MODE:
@@ -177,9 +195,8 @@ if st.button("Generate Accurate Growth Report 🔍", type="primary"):
                 real_data, display_banner = get_youtube_real_data(handle)
                 if not real_data:
                     st.error(display_banner)
-                    st.stop() # తప్పుడు అనాలిసిస్ రాకుండా ఇక్కడే ఆపుతుంది!
+                    st.stop()
             else:
-                # Instagram & TikTok కోసం యూజర్ ఇచ్చిన పేరు/లింక్ ఆధారంగా
                 real_data = f"Platform: {platform} | Profile/Link: {handle}"
                 display_banner = f"📱 Analyzing **{handle}** on {platform}"
 
@@ -203,10 +220,3 @@ if st.button("Generate Accurate Growth Report 🔍", type="primary"):
             5. **Best Posting Strategy & Monetization Tip**
             """
             
-            report = generate_accurate_report(prompt)
-            
-            if report.startswith("⚠️"):
-                st.error(report)
-            else:
-                st.success("✅ 100% Data-Backed Growth Report Ready!")
-                st.markdown(report)
