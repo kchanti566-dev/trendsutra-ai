@@ -55,7 +55,7 @@ st.info(
 )
 
 # --- ఇన్‌పుట్ విభాగం (Platform & Link) ---
-col1, col2 = st.columns([1, 2])
+col1, col2 = st.columns(2)
 with col1:
   platform = st.selectbox(
       "Select Platform:", ["YouTube", "Instagram Reels", "TikTok"]
@@ -67,7 +67,7 @@ with col2:
   )
 
 
-# --- డేటా సేకరణ ఫంక్షన్లు (Safe Fetching without JSON Crash) ---
+# --- డేటా సేకరణ ఫంక్షన్లు ---
 def extract_youtube_id(url):
   pattern = r"(?:v=|\/|live\/|shorts\/)([0-9A-Za-z_-]{11}).*"
   match = re.search(pattern, url)
@@ -131,12 +131,11 @@ def fetch_rapidapi_safe(api_url, host, params, fallback_label):
   try:
     headers = {"x-rapidapi-key": RAPIDAPI_KEY, "x-rapidapi-host": host}
     res = requests.get(api_url, headers=headers, params=params, timeout=15)
-    # ఖాళీ రెస్పాన్స్ చెక్ (Expecting value line 1 column 1 ఎర్రర్ రాకుండా ఆపుతుంది)
     if res.status_code == 200 and res.text and res.text.strip():
       return f"{fallback_label} Data:\n{res.text[:3500]}"
     return (
-        f"{fallback_label} URL provided (API returned empty/rate-limited"
-        f" status {res.status_code}). Analyze based on URL structure & niche."
+        f"{fallback_label} URL provided (API status {res.status_code}). Analyze"
+        " based on URL structure & niche."
     )
   except Exception as e:
     return f"{fallback_label} URL provided (Fetch note: {str(e)})."
@@ -144,12 +143,13 @@ def fetch_rapidapi_safe(api_url, host, params, fallback_label):
 
 def generate_growth_report(platform_name, raw_data, lang, audience):
   prompt = f"""
-    You are an elite {platform_name} Growth Strategist and Viral Content Architect.
+    You are a {platform_name} Growth Strategist and Viral Content Architect for TrendSutra AI.
     Analyze the following data and create a comprehensive, actionable A-to-Z Growth Audit Report.
     
     - Output Language: {lang} (Write strictly in this language; if Telugu, use natural, clear Telugu).
     - Target Audience Focus: {audience}
     - Opening Rule: Do NOT say "As an elite strategist". Start with a 1-line intro mentioning "TrendSutra AI" (e.g., in Telugu: "TrendSutra AI లోతైన విశ్లేషణ ప్రకారం మీ గ్రోత్ రిపోర్ట్ ఇక్కడ ఉంది:"), then go straight to Section 1.
+    
     Source Data:
     {raw_data}
     
@@ -173,7 +173,7 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
   return f"⚠️ AI సర్వర్ ప్రస్తుతం బిజీగా ఉంది. దయచేసి కొద్దిసేపటి తర్వాత ప్రయత్నించండి. ({last_err})"
 
 
-# --- ఎరుపు రంగు బటన్ (Red Action Button) ---
+# --- బటన్ స్టైలింగ్ (Red Generate Button + Green Download Button) ---
 st.markdown(
     """
 <style>
@@ -189,10 +189,30 @@ div.stButton > button:first-child:hover {
     background-color: #a61e1e;
     color: white;
 }
+div.stDownloadButton > button:first-child {
+    background-color: #2b8a3e;
+    color: white;
+    font-weight: bold;
+    border-radius: 6px;
+    padding: 0.5rem 1.2rem;
+    border: none;
+}
+div.stDownloadButton > button:first-child:hover {
+    background-color: #237032;
+    color: white;
+}
 </style>
 """,
     unsafe_allow_html=True,
 )
+
+# రిపోర్ట్‌ను సెషన్‌లో సేవ్ చేయడానికి (డౌన్‌లోడ్ నొక్కినప్పుడు పేజీ రీసెట్ అవ్వకుండా ఉండటానికి)
+if "generated_report" not in st.session_state:
+  st.session_state.generated_report = ""
+if "report_stats" not in st.session_state:
+  st.session_state.report_stats = None
+if "report_platform" not in st.session_state:
+  st.session_state.report_platform = ""
 
 if st.button("Generate Accurate Growth Report 🔍"):
   if not video_url.strip():
@@ -222,15 +242,44 @@ if st.button("Generate Accurate Growth Report 🔍"):
     if platform == "YouTube" and not data_text:
       st.error(f"⚠️ {stats_obj}")
     else:
-      if platform == "YouTube" and isinstance(stats_obj, dict):
-        m1, m2, m3 = st.columns(3)
-        m1.metric("👀 Views", f"{int(stats_obj.get('viewCount', 0)):,}")
-        m2.metric("👍 Likes", f"{int(stats_obj.get('likeCount', 0)):,}")
-        m3.metric("💬 Comments", f"{int(stats_obj.get('commentCount', 0)):,}")
-
       with st.spinner("TrendSutra AI లోతుగా విశ్లేషిస్తోంది..."):
         report = generate_growth_report(
             platform, data_text, report_lang, target_audience
         )
-        st.success("✅ Growth Audit Report సిద్ధమైంది!")
-        st.markdown(report)
+        st.session_state.generated_report = report
+        st.session_state.report_stats = (
+            stats_obj if platform == "YouTube" else None
+        )
+        st.session_state.report_platform = platform
+
+# --- రిపోర్ట్ మరియు డౌన్‌లోడ్ బటన్ ప్రదర్శన ---
+if st.session_state.generated_report:
+  if isinstance(st.session_state.report_stats, dict):
+    m1, m2, m3 = st.columns(3)
+    m1.metric(
+        "👀 Views", f"{int(st.session_state.report_stats.get('viewCount', 0)):,}"
+    )
+    m2.metric(
+        "👍 Likes", f"{int(st.session_state.report_stats.get('likeCount', 0)):,}"
+    )
+    m3.metric(
+        "💬 Comments",
+        f"{int(st.session_state.report_stats.get('commentCount', 0)):,}",
+    )
+
+  st.success("✅ Growth Audit Report సిద్ధమైంది!")
+
+  # ఆకుపచ్చ రంగు డౌన్‌లోడ్ బటన్
+  file_content = (
+      f"=== TrendSutra AI - {st.session_state.report_platform} Growth Audit"
+      f" Report ===\nPowered by AIENGTEL.com\n\n{st.session_state.generated_report}"
+  )
+  st.download_button(
+      label="📥 Download Growth Report (.txt)",
+      data=file_content,
+      file_name=f"TrendSutra_AI_{st.session_state.report_platform}_Report.txt",
+      mime="text/plain",
+  )
+
+  st.markdown("---")
+  st.markdown(st.session_state.generated_report)
