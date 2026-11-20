@@ -14,52 +14,50 @@ st.set_page_config(
 )
 
 def get_youtube_real_data(url_or_handle):
-    raw_yt_key = str(st.secrets.get("YOUTUBE_API_KEY", "")).strip()
-    key_match = re.search(r"(AIza[0-9A-Za-z_-]{35})", raw_yt_key)
-    clean_yt_key = key_match.group(1) if key_match else ""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+    }
 
     vid_match = re.search(r"(?:v=|youtu\.be\/|shorts\/|live\/)([0-9A-Za-z_-]{11})", url_or_handle)
     if vid_match:
         video_id = vid_match.group(1)
-        if clean_yt_key:
-            try:
-                api_url = "https://googleapis.com"
-                params = {"part": "snippet,statistics", "id": video_id, "key": clean_yt_key}
-                r = requests.get(api_url, params=params, timeout=6).json()
-                if "error" in r:
-                    return None, f"⚠️ YouTube API Key Error: {r['error'].get('message')}"
-                items = r.get("items", [])
-                if items:
-                    first_item = items[0]
-                    snippet = first_item.get("snippet", {})
-                    stats = first_item.get("statistics", {})
-                    tags = ", ".join(snippet.get("tags", [])[:10])
-                    data_summary = f"Type: YouTube Video | Title: {snippet.get('title')} | Channel: {snippet.get('channelTitle')} | Desc: {snippet.get('description', '')[:300]} | Tags: {tags} | Views: {stats.get('viewCount', '0')}, Likes: {stats.get('likeCount', '0')}"
-                    return data_summary, f"🎥 **{snippet.get('title')}** (Channel: {snippet.get('channelTitle')} | 👁️ {stats.get('viewCount', '0')} Views)"
-            except Exception as e:
-                return None, f"⚠️ Connection Error: {str(e)}"
+        try:
+            page = requests.get(f"https://youtube.com{video_id}", headers=headers, timeout=8)
+            html = page.text
+            title_m = re.search(r'<meta name="title" content="(.*?)">', html)
+            desc_m = re.search(r'<meta name="description" content="(.*?)">', html)
+            kw_m = re.search(r'<meta name="keywords" content="(.*?)">', html)
+            
+            title = title_m.group(1) if title_m else ""
+            if not title:
+                t2 = re.search(r"<title>(.*?)</title>", html)
+                title = t2.group(1).replace(" - YouTube", "").strip() if t2 else ""
+
+            if title and title != "YouTube":
+                desc = desc_m.group(1)[:300] if desc_m else "N/A"
+                kws = kw_m.group(1)[:200] if kw_m else "N/A"
+                data_summary = f"Type: YouTube Video | Exact Video Title: {title} | Description: {desc} | Keywords: {kws}"
+                return data_summary, f"🎥 **{title}**"
+        except Exception as e:
+            return None, f"⚠️ Error: {str(e)}"
 
     handle_match = re.search(r"@([0-9A-Za-z_.-]+)", url_or_handle)
-    if handle_match and clean_yt_key:
+    if handle_match:
+        handle_name = "@" + handle_match.group(1)
         try:
-            handle_name = "@" + handle_match.group(1)
-            api_url = "https://googleapis.com"
-            params = {"part": "snippet,statistics", "forHandle": handle_name, "key": clean_yt_key}
-            r = requests.get(api_url, params=params, timeout=6).json()
-            items = r.get("items", [])
-            if items:
-                first_item = items[0]
-                snippet = first_item.get("snippet", {})
-                stats = first_item.get("statistics", {})
-                data_summary = f"Type: YouTube Channel | Channel: {snippet.get('title')} | Bio: {snippet.get('description', '')[:300]} | Subscribers: {stats.get('subscriberCount', 'Hidden')}, Views: {stats.get('viewCount', '0')}, Videos: {stats.get('videoCount', '0')}"
-                return data_summary, f"📺 **{snippet.get('title')}** (👥 {stats.get('subscriberCount', 'Hidden')} Subscribers | 🎬 {stats.get('videoCount', '0')} Videos)"
+            page = requests.get(f"https://youtube.com{handle_name}", headers=headers, timeout=8)
+            title_m = re.search(r'<meta property="og:title" content="(.*?)">', page.text)
+            desc_m = re.search(r'<meta property="og:description" content="(.*?)">', page.text)
+            if title_m:
+                ch_title = title_m.group(1)
+                ch_desc = desc_m.group(1)[:300] if desc_m else ""
+                data_summary = f"Type: YouTube Channel | Channel Name: {ch_title} | Bio: {ch_desc}"
+                return data_summary, f"📺 **{ch_title}**"
         except Exception as e:
-            return None, f"⚠️ Channel Error: {str(e)}"
+            return None, f"⚠️ Error: {str(e)}"
 
-    if not clean_yt_key:
-        return None, "⚠️ Streamlit Secrets లో YOUTUBE_API_KEY సరిగ్గా లేదు (AIzaSy... తో మొదలవ్వాలి)."
-
-    return None, "⚠️ ఈ లింక్ నుండి వీడియో వివరాలు దొరకలేదు. దయచేసి సరైన YouTube వీడియో లింక్ ఇవ్వండి."
+    return None, "⚠️ దయచేసి సరైన పబ్లిక్ YouTube వీడియో లింక్ లేదా @ChannelHandle ఇవ్వండి."
 def generate_accurate_report(prompt):
     api_keys = [str(st.secrets.get("GEMINI_API_KEY", "")).strip(), str(st.secrets.get("GEMINI_API_KEY_2", "")).strip()]
     api_keys = [k for k in api_keys if k]
