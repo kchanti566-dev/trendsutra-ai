@@ -14,7 +14,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Gemini API Auto-Rotation Function (Updated SDK)
+# 2. Gemini API Auto-Rotation Function (Updated to gemini-3.8-flash)
 def generate_with_rotation(prompt):
     api_keys = [
         st.secrets.get("GEMINI_API_KEY"),
@@ -25,21 +25,27 @@ def generate_with_rotation(prompt):
     if not api_keys:
         return "⚠️ API Key కనుగొనబడలేదు! దయచేసి Streamlit Cloud -> Settings -> Secrets లో GEMINI_API_KEY ని యాడ్ చేయండి."
 
+    models_to_try = ["gemini-3.8-flash", "gemini-3.0-flash", "gemini-2.5-flash"]
     last_error = ""
+
     for key in api_keys:
-        try:
-            client = genai.Client(api_key=key)
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-            )
-            return response.text
-        except Exception as e:
-            last_error = str(e)
-            continue
+        client = genai.Client(api_key=key)
+        for model_name in models_to_try:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                )
+                return response.text
+            except Exception as e:
+                last_error = str(e)
+                if "NOT_FOUND" in last_error or "404" in last_error:
+                    continue # తర్వాతి మోడల్ పేరు ప్రయత్నిస్తుంది
+                else:
+                    break # కీ లిమిట్ అయిపోతే రెండో API కీకి మారుతుంది
     return f"⚠️ API Error: {last_error}"
 
-# 3. Safe PDF Generation Function (Fixed AttributeError)
+# 3. Safe PDF Generation Function
 def create_pdf(report_text, platform, username):
     pdf = FPDF()
     pdf.add_page()
@@ -47,7 +53,6 @@ def create_pdf(report_text, platform, username):
     pdf.cell(0, 10, text=f"CreatorPulse AI - Growth Report ({platform})", new_x="LMARGIN", new_y="NEXT", align='C')
     pdf.cell(0, 10, text=f"Account: {username} | Powered by AIENGTEL.com", new_x="LMARGIN", new_y="NEXT", align='C')
     pdf.ln(8)
-    # తెలుగు/ప్రాంతీయ అక్షరాల వల్ల PDF క్రాష్ అవ్వకుండా సురక్షితంగా మార్చడం
     clean_text = report_text.encode('latin-1', 'replace').decode('latin-1')
     pdf.multi_cell(0, 8, text=clean_text)
     return bytes(pdf.output())
