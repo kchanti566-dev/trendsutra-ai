@@ -14,42 +14,43 @@ def get_gemini_keys():
     if "GEMINI_API_KEYS" in st.secrets:
         val = st.secrets["GEMINI_API_KEYS"]
         if isinstance(val, list):
-            keys.extend([k.strip() for k in val if k and k.strip()])
+            keys.extend([str(k).strip() for k in val if k and str(k).strip()])
         elif isinstance(val, str):
             keys.extend([k.strip() for k in val.split(",") if k.strip()])
     if "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
-        single_key = st.secrets["GEMINI_API_KEY"].strip()
-        if single_key not in keys:
+        single_key = str(st.secrets["GEMINI_API_KEY"]).strip()
+        if single_key and single_key not in keys:
             keys.append(single_key)
     return keys
 
-def generate_with_rotation(prompt: str, model_name: str = "gemini-2.5-flash") -> str:
+def generate_with_rotation(prompt: str) -> str:
     keys = get_gemini_keys()
     if not keys:
         return "❌ Streamlit Secrets లో Gemini API Key లేదు. దయచేసి యాడ్ చేయండి."
 
-    # Session state rotation index
     if "gemini_key_idx" not in st.session_state:
         st.session_state.gemini_key_idx = 0
 
+    models_to_try = ["gemini-3.8-flash", "gemini-2.5-flash"]
     total = len(keys)
     last_error = None
 
     for attempt in range(total):
         idx = (st.session_state.gemini_key_idx + attempt) % total
         api_key = keys[idx]
-        try:
-            client = genai.Client(api_key=api_key)
-            response = client.models.generate_content(
-                model=model_name,
-                contents=prompt,
-            )
-            # Success -> next call starts after working key
-            st.session_state.gemini_key_idx = (idx + 1) % total
-            return response.text
-        except Exception as e:
-            last_error = str(e)
-            continue
+        for model_name in models_to_try:
+            try:
+                client = genai.Client(api_key=api_key)
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                )
+                if response and getattr(response, "text", None):
+                    st.session_state.gemini_key_idx = (idx + 1) % total
+                    return response.text
+            except Exception as e:
+                last_error = f"[{model_name}] {str(e)}"
+                continue
 
     return f"❌ అన్ని Gemini API Keys విఫలమయ్యాయి. చివరి లోపం: {last_error}"
 
