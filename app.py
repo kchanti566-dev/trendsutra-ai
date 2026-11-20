@@ -149,7 +149,7 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
     
     - Output Language: {lang} (Write strictly in this language; if Telugu, use natural, clear Telugu).
     - Target Audience Focus: {audience}
-    
+    - Opening Rule: Do NOT say "As an elite strategist". Start with a 1-line intro mentioning "TrendSutra AI" (e.g., in Telugu: "TrendSutra AI లోతైన విశ్లేషణ ప్రకారం మీ గ్రోత్ రిపోర్ట్ ఇక్కడ ఉంది:"), then go straight to Section 1.
     Source Data:
     {raw_data}
     
