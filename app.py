@@ -3,7 +3,6 @@ from google import genai
 import requests
 import re
 import time
-from fpdf import FPDF
 
 # ==========================================
 # ⚙️ LAUNCH SETTINGS
@@ -17,32 +16,58 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Fast YouTube Video Info Fetcher
-def get_youtube_context(url_or_handle):
+# 2. Accurate YouTube Video & Channel Data Fetcher
+def get_youtube_real_data(url_or_handle):
     yt_key = st.secrets.get("YOUTUBE_API_KEY")
     if not yt_key:
-        return ""
+        return None, "⚠️ YouTube API Key missing in Streamlit Secrets."
+    
     try:
-        vid_match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url_or_handle)
+        # 1. ముందుగా వీడియో లింక్ (youtu.be/xyz లేదా ://youtube.com లేదా shorts/xyz) చెక్ చేస్తుంది
+        vid_match = re.search(r"(?:v=|youtu\.be\/|shorts\/)([0-9A-Za-z_-]{11})", url_or_handle)
         if vid_match:
             video_id = vid_match.group(1)
             api_url = f"https://googleapis.com{video_id}&key={yt_key}"
-            res = requests.get(api_url, timeout=4).json()
+            res = requests.get(api_url, timeout=5).json()
             if res.get("items"):
                 item = res["items"]
                 snippet = item["snippet"]
                 stats = item["statistics"]
-                return (
-                    f"Real Video Title: {snippet.get('title')} | "
-                    f"Channel: {snippet.get('channelTitle')} | "
-                    f"Views: {stats.get('viewCount', 'N/A')}, Likes: {stats.get('likeCount', 'N/A')}"
+                tags = ", ".join(snippet.get("tags", [])[:10])
+                data_summary = (
+                    f"Type: YouTube Video\n"
+                    f"Exact Video Title: {snippet.get('title')}\n"
+                    f"Channel Name: {snippet.get('channelTitle')}\n"
+                    f"Description Snippet: {snippet.get('description', '')[:300]}\n"
+                    f"Tags Used: {tags if tags else 'No tags'}\n"
+                    f"Views: {stats.get('viewCount', '0')} | Likes: {stats.get('likeCount', '0')} | Comments: {stats.get('commentCount', '0')}"
                 )
-    except Exception:
-        pass
-    return ""
+                return data_summary, f"🎥 **{snippet.get('title')}** (Channel: {snippet.get('channelTitle')} | 👁️ {stats.get('viewCount', '0')} Views)"
 
-# 3. Smart Auto-Discovery & Auto-Rotation Gemini Function (Zero 404/503 Errors)
-def generate_fast_report(prompt):
+        # 2. ఒకవేళ ఛానల్ హ్యాండిల్ (@username) ఇస్తే ఛానల్ డేటా తెస్తుంది
+        handle_match = re.search(r"@([0-9A-Za-z_.-]+)", url_or_handle)
+        if handle_match:
+            handle_name = "@" + handle_match.group(1)
+            api_url = f"https://googleapis.com{handle_name}&key={yt_key}"
+            res = requests.get(api_url, timeout=5).json()
+            if res.get("items"):
+                item = res["items"]
+                snippet = item["snippet"]
+                stats = item["statistics"]
+                data_summary = (
+                    f"Type: YouTube Channel\n"
+                    f"Channel Name: {snippet.get('title')}\n"
+                    f"Channel Bio/Description: {snippet.get('description', '')[:300]}\n"
+                    f"Subscribers: {stats.get('subscriberCount', 'Hidden')} | Total Views: {stats.get('viewCount', '0')} | Total Videos: {stats.get('videoCount', '0')}"
+                )
+                return data_summary, f"📺 **{snippet.get('title')}** (👥 {stats.get('subscriberCount', 'Hidden')} Subscribers | 🎬 {stats.get('videoCount', '0')} Videos)"
+
+        return None, "⚠️ ఈ YouTube లింక్/హ్యాండిల్ నుండి డేటా దొరకలేదు. దయచేసి సరైన పూర్తి వీడియో లింక్ లేదా @ChannelHandle ఇవ్వండి."
+    except Exception as e:
+        return None, f"⚠️ YouTube API Error: {str(e)}"
+
+# 3. Smart Auto-Rotation Gemini Function
+def generate_accurate_report(prompt):
     api_keys = [
         st.secrets.get("GEMINI_API_KEY"),
         st.secrets.get("GEMINI_API_KEY_2")
@@ -56,7 +81,6 @@ def generate_fast_report(prompt):
     for key in api_keys:
         try:
             client = genai.Client(api_key=key)
-            # ముందుగా gemini-3.8-flash తో ప్రయత్నిస్తుంది, 503 వస్తే 2 సెకన్లు ఆగి మళ్ళీ ట్రై చేస్తుంది
             for attempt in range(2):
                 try:
                     response = client.models.generate_content(
@@ -72,7 +96,6 @@ def generate_fast_report(prompt):
                     else:
                         break
             
-            # ఒకవేళ 3.8-flash బిజీగా ఉంటే, మీ అకౌంట్‌లో ఉన్న ఇతర అందుబాటులో ఉన్న ఫ్లాష్ మోడల్‌ను ఆటోమేటిక్‌గా వాడుతుంది
             for m in client.models.list():
                 if "flash" in m.name and "3.8" not in m.name:
                     try:
@@ -90,19 +113,7 @@ def generate_fast_report(prompt):
 
     return f"⚠️ Server is temporarily busy. Please click Generate again! ({last_error})"
 
-# 4. Safe PDF Generation Function
-def create_pdf(report_text, platform, username):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Helvetica", size=12)
-    pdf.cell(0, 10, text=f"CreatorPulse AI - Growth Report ({platform})", new_x="LMARGIN", new_y="NEXT", align='C')
-    pdf.cell(0, 10, text=f"Account: {username} | Powered by AIENGTEL.com", new_x="LMARGIN", new_y="NEXT", align='C')
-    pdf.ln(8)
-    clean_text = report_text.encode('latin-1', 'replace').decode('latin-1')
-    pdf.multi_cell(0, 8, text=clean_text)
-    return bytes(pdf.output())
-
-# 5. Sidebar - Global & Regional Settings + AIENGTEL Branding
+# 4. Sidebar - Global & Regional Settings + AIENGTEL Branding
 with st.sidebar:
     st.title("🌍 Global & Regional Settings")
     
@@ -127,77 +138,75 @@ with st.sidebar:
     st.divider()
     
     if FREE_LAUNCH_MODE:
-        st.success("🎉 **FREE LAUNCH OFFER!**\nAll Pro features & PDF downloads are 100% FREE for a limited time!")
-        is_pro = True
+        st.success("🎉 **FREE LAUNCH OFFER!**\nUnlimited Deep AI Audits are 100% FREE for a limited time!")
     else:
         region = st.radio("Select Currency:", ["India (₹ INR)", "International ($ USD)"])
         if region == "India (₹ INR)":
-            st.info("💎 **Pro Plan: ₹199 / month**\n- Unlimited Audits & PDF Reports")
+            st.info("💎 **Pro Plan: ₹199 / month**\n- Unlimited Deep Audits")
             st.markdown("[👉 Pay ₹199 via UPI / Razorpay](https://your-razorpay-link.com)")
         else:
-            st.info("💎 **Pro Plan: $5 / month**\n- Unlimited Audits & PDF Reports")
+            st.info("💎 **Pro Plan: $5 / month**\n- Unlimited Deep Audits")
             st.markdown("[👉 Pay $5 via International Card](https://your-international-link.com)")
-        
-        pro_code = st.text_input("Enter Pro Access Code:", type="password")
-        is_pro = True if pro_code == "CREATORPRO2026" else False
 
     st.divider()
     st.markdown("### 🔗 Explore More AI Tools")
     st.markdown("Discover 100+ Best AI Tools in **English & తెలుగు** at **[AIENGTEL.com](https://aiengtel.com)** 🚀")
 
-# 6. Main App Interface (2 Clean Columns - No Niche Box)
+# 5. Main App Interface (2 Clean Columns - No Niche Box, No PDF)
 st.title("🚀 CreatorPulse AI")
 st.markdown("##### A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powered by **[AIENGTEL.com](https://aiengtel.com)**")
 
 if FREE_LAUNCH_MODE:
-    st.info("🎁 **Special Launch Access:** Enjoy unlimited AI Growth Audits & Free PDF Downloads for the next few days!")
+    st.info("🎁 **Special Launch Access:** Enjoy unlimited real-data AI Growth Audits for free!")
 
-col1, col2 = st.columns([1, 2])
+col1, col2 = st.columns()
 with col1:
     platform = st.selectbox("Select Platform:", ["YouTube", "Instagram", "TikTok"])
 with col2:
-    handle = st.text_input("Channel / Profile / Video Link:", placeholder="@username or paste video/profile link here")
+    handle = st.text_input("Channel / Profile / Video Link:", placeholder="Paste YouTube video/channel link or @username")
 
-if st.button("Generate Free Growth Report 🔍", type="primary"):
+if st.button("Generate Accurate Growth Report 🔍", type="primary"):
     if not handle:
-        st.warning("Please enter a valid username or link!")
+        st.warning("Please enter a valid link or @username!")
     else:
-        with st.spinner("⚡ Analyzing & generating your Growth Report..."):
-            live_data = get_youtube_context(handle) if platform == "YouTube" else ""
+        with st.spinner("⚡ Fetching real profile/video data & analyzing..."):
+            real_data = ""
+            display_banner = ""
             
-            prompt = f"""
-            Act as an expert Social Media Growth Strategist. Automatically identify the creator's niche from the link/handle/data provided, and give a crisp, high-impact A-to-Z growth report strictly in {selected_lang}.
-            Platform: {platform}
-            Input Link/Handle: {handle}
-            {live_data}
-            Target Audience: {audience_type}
+            if platform == "YouTube":
+                real_data, display_banner = get_youtube_real_data(handle)
+                if not real_data:
+                    st.error(display_banner)
+                    st.stop() # తప్పుడు అనాలిసిస్ రాకుండా ఇక్కడే ఆపుతుంది!
+            else:
+                # Instagram & TikTok కోసం యూజర్ ఇచ్చిన పేరు/లింక్ ఆధారంగా
+                real_data = f"Platform: {platform} | Profile/Link: {handle}"
+                display_banner = f"📱 Analyzing **{handle}** on {platform}"
 
-            Keep each section concise (3-4 bullet points max per section) for fast reading:
-            1. **Profile / Video Audit & Optimization**
-            2. **3 Viral Hook & Content Ideas**
-            3. **SEO Keywords & Hashtags**
-            4. **Best Posting Time & Growth Hack**
-            5. **Monetization Tip**
+            st.info(display_banner)
+
+            prompt = f"""
+            You are an expert Social Media Growth Strategist. 
+            CRITICAL RULE: Base your analysis STRICTLY on the real verified data provided below. Do NOT guess or hallucinate false topics, titles, or numbers.
+            
+            VERIFIED REAL DATA:
+            {real_data}
+            
+            Target Audience: {audience_type}
+            Output Language: Strictly write the entire response in {selected_lang}.
+
+            Provide a sharp, accurate A-to-Z growth report with these 5 sections (keep each bullet point practical and specific to the exact title/channel above):
+            1. **Exact Title, Hook & Content Audit** (Analyze what is working or missing in the current title/description/stats)
+            2. **3 Better Viral Title & Content Ideas** (Directly related to this exact topic/niche)
+            3. **High-Ranking SEO Keywords & Hashtags** (Relevant to {audience_type})
+            4. **Engagement & Watch-Time Improvement Tips**
+            5. **Best Posting Strategy & Monetization Tip**
             """
             
-            report = generate_fast_report(prompt)
+            report = generate_accurate_report(prompt)
             
             if report.startswith("⚠️"):
                 st.error(report)
             else:
-                st.success("✅ Report Generated!")
-                if live_data:
-                    st.caption(f"📊 Fetched Live Stats: {live_data}")
+                st.success("✅ 100% Data-Backed Growth Report Ready!")
                 st.markdown(report)
-                
-                if is_pro:
-                    try:
-                        pdf_bytes = create_pdf(report, platform, handle)
-                        st.download_button(
-                            label="📥 Download Report as PDF",
-                            data=pdf_bytes,
-                            file_name="CreatorPulse_Report.pdf",
-                            mime="application/pdf"
-                        )
-                    except Exception:
-                        pass
