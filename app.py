@@ -44,7 +44,16 @@ with st.sidebar:
   )
 
 # --- ప్రధాన పేజీ ---
-st.markdown("# 🚀 TrendSutra AI")
+col_logo, col_title = st.columns([1, 6])
+with col_logo:
+  st.image("logo.png", width=110)
+with col_title:
+  st.markdown("# TrendSutra AI")
+  st.markdown(
+      "**A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powered by"
+      " [AIENGTEL.com](https://aiengtel.com)**"
+  )
+
 st.markdown(
     "**A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powered by"
     " [AIENGTEL.com](https://aiengtel.com)**"
