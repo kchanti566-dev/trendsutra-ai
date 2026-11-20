@@ -159,7 +159,7 @@ st.markdown("##### A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powe
 if FREE_LAUNCH_MODE:
     st.info("🎁 **Special Launch Access:** Enjoy unlimited real-data AI Growth Audits for free!")
 
-col1, col2 = st.columns()
+col1, col2 = st.columns(2)
 with col1:
     platform = st.selectbox("Select Platform:", ["YouTube", "Instagram", "TikTok"])
 with col2:
