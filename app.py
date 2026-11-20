@@ -17,22 +17,22 @@ def get_youtube_real_data(url_or_handle):
     raw_yt_key = str(st.secrets.get("YOUTUBE_API_KEY", "")).strip()
     key_match = re.search(r"(AIza[0-9A-Za-z_-]{35})", raw_yt_key)
     clean_yt_key = key_match.group(1) if key_match else ""
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    headers = {"User-Agent": "Mozilla/5.0"}
 
-    vid_match = re.search(r"(?:v=|youtu\.be\/|shorts\/)([0-9A-Za-z_-]{11})", url_or_handle)
+    vid_match = re.search(r"(?:v=|youtu\.be\/|shorts\/|live\/)([0-9A-Za-z_-]{11})", url_or_handle)
     if vid_match:
         video_id = vid_match.group(1)
         if clean_yt_key:
             try:
                 api_url = "https://googleapis.com"
                 params = {"part": "snippet,statistics", "id": video_id, "key": clean_yt_key}
-                r = requests.get(api_url, params=params, headers=headers, timeout=6)
-                if r.status_code == 200 and r.text.strip():
-                    res = r.json()
-                    items = res.get("items", [])
+                r = requests.get(api_url, params=params, timeout=6)
+                if r.status_code == 200:
+                    items = r.json().get("items", [])
                     if len(items) > 0:
-                        snippet = items[0].get("snippet", {})
-                        stats = items[0].get("statistics", {})
+                        first_item = items[0]
+                        snippet = first_item.get("snippet", {})
+                        stats = first_item.get("statistics", {})
                         tags = ", ".join(snippet.get("tags", [])[:10])
                         data_summary = f"Type: YouTube Video | Title: {snippet.get('title')} | Channel: {snippet.get('channelTitle')} | Desc: {snippet.get('description', '')[:300]} | Tags: {tags} | Views: {stats.get('viewCount', '0')}, Likes: {stats.get('likeCount', '0')}"
                         return data_summary, f"🎥 **{snippet.get('title')}** (Channel: {snippet.get('channelTitle')} | 👁️ {stats.get('viewCount', '0')} Views)"
@@ -40,22 +40,12 @@ def get_youtube_real_data(url_or_handle):
                 pass
 
         try:
-            oembed_url = "https://youtube.com"
-            ores = requests.get(oembed_url, params={"url": f"https://youtube.com{video_id}", "format": "json"}, headers=headers, timeout=6)
-            if ores.status_code == 200 and ores.text.strip():
+            ores = requests.get(f"https://noembed.com{video_id}", timeout=6)
+            if ores.status_code == 200:
                 odata = ores.json()
-                data_summary = f"Type: YouTube Video | Exact Video Title: {odata.get('title')} | Channel Name: {odata.get('author_name')}"
-                return data_summary, f"🎥 **{odata.get('title')}** (Channel: {odata.get('author_name')})"
-        except Exception:
-            pass
-
-        try:
-            page = requests.get(f"https://youtube.com{video_id}", headers=headers, timeout=6)
-            title_match = re.search(r"<title>(.*?)</title>", page.text)
-            if title_match:
-                clean_title = title_match.group(1).replace(" - YouTube", "").strip()
-                if clean_title and clean_title != "YouTube":
-                    return f"Type: YouTube Video | Exact Video Title: {clean_title}", f"🎥 **{clean_title}**"
+                if odata.get("title"):
+                    data_summary = f"Type: YouTube Video | Exact Video Title: {odata.get('title')} | Channel Name: {odata.get('author_name', 'YouTube Creator')}"
+                    return data_summary, f"🎥 **{odata.get('title')}** (Channel: {odata.get('author_name', 'YouTube Creator')})"
         except Exception:
             pass
 
@@ -65,13 +55,13 @@ def get_youtube_real_data(url_or_handle):
             handle_name = "@" + handle_match.group(1)
             api_url = "https://googleapis.com"
             params = {"part": "snippet,statistics", "forHandle": handle_name, "key": clean_yt_key}
-            r = requests.get(api_url, params=params, headers=headers, timeout=6)
-            if r.status_code == 200 and r.text.strip():
-                res = r.json()
-                items = res.get("items", [])
+            r = requests.get(api_url, params=params, timeout=6)
+            if r.status_code == 200:
+                items = r.json().get("items", [])
                 if len(items) > 0:
-                    snippet = items[0].get("snippet", {})
-                    stats = items[0].get("statistics", {})
+                    first_item = items[0]
+                    snippet = first_item.get("snippet", {})
+                    stats = first_item.get("statistics", {})
                     data_summary = f"Type: YouTube Channel | Channel: {snippet.get('title')} | Bio: {snippet.get('description', '')[:300]} | Subscribers: {stats.get('subscriberCount', 'Hidden')}, Views: {stats.get('viewCount', '0')}, Videos: {stats.get('videoCount', '0')}"
                     return data_summary, f"📺 **{snippet.get('title')}** (👥 {stats.get('subscriberCount', 'Hidden')} Subscribers | 🎬 {stats.get('videoCount', '0')} Videos)"
         except Exception:
