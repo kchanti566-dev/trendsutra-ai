@@ -1,12 +1,11 @@
 import streamlit as st
-import google.generativeai as genai
-import requests
+from google import genai
 from fpdf import FPDF
 
 # ==========================================
-# ⚙️ LAUNCH SETTINGS (Free Launch vs Paid Pro)
+# ⚙️ LAUNCH SETTINGS
 # ==========================================
-FREE_LAUNCH_MODE = True  # కొన్ని రోజుల తర్వాత దీనిని False అని మారిస్తే Pro Plan ఆన్ అవుతుంది!
+FREE_LAUNCH_MODE = True  # కొన్ని రోజుల తర్వాత False చేస్తే Pro Plan ఆన్ అవుతుంది
 
 # 1. Page Configuration
 st.set_page_config(
@@ -15,7 +14,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Gemini API Auto-Rotation Function
+# 2. Gemini API Auto-Rotation Function (Updated SDK)
 def generate_with_rotation(prompt):
     api_keys = [
         st.secrets.get("GEMINI_API_KEY"),
@@ -23,33 +22,40 @@ def generate_with_rotation(prompt):
     ]
     api_keys = [k for k in api_keys if k]
     
+    if not api_keys:
+        return "⚠️ API Key కనుగొనబడలేదు! దయచేసి Streamlit Cloud -> Settings -> Secrets లో GEMINI_API_KEY ని యాడ్ చేయండి."
+
+    last_error = ""
     for key in api_keys:
         try:
-            genai.configure(api_key=key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(prompt)
+            client = genai.Client(api_key=key)
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+            )
             return response.text
         except Exception as e:
-            continue # మొదటి కీ లిమిట్ అయిపోతే రెండో కీకి మారుతుంది
-    return "Error: Server is busy due to high traffic. Please try again in a minute."
+            last_error = str(e)
+            continue
+    return f"⚠️ API Error: {last_error}"
 
-# 3. PDF Generation Function
+# 3. Safe PDF Generation Function (Fixed AttributeError)
 def create_pdf(report_text, platform, username):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt=f"CreatorPulse AI - Growth Report ({platform})", ln=True, align='C')
-    pdf.cell(200, 10, txt=f"Account: {username} | Powered by AIENGTEL.com", ln=True, align='C')
-    pdf.ln(10)
+    pdf.set_font("Helvetica", size=12)
+    pdf.cell(0, 10, text=f"CreatorPulse AI - Growth Report ({platform})", new_x="LMARGIN", new_y="NEXT", align='C')
+    pdf.cell(0, 10, text=f"Account: {username} | Powered by AIENGTEL.com", new_x="LMARGIN", new_y="NEXT", align='C')
+    pdf.ln(8)
+    # తెలుగు/ప్రాంతీయ అక్షరాల వల్ల PDF క్రాష్ అవ్వకుండా సురక్షితంగా మార్చడం
     clean_text = report_text.encode('latin-1', 'replace').decode('latin-1')
-    pdf.multi_cell(0, 8, txt=clean_text)
-    return pdf.output(dest="S").encode("latin-1")
+    pdf.multi_cell(0, 8, text=clean_text)
+    return bytes(pdf.output())
 
 # 4. Sidebar - Global & Regional Settings + AIENGTEL Branding
 with st.sidebar:
     st.title("🌍 Global & Regional Settings")
     
-    # భాష ఎంపిక (AIENGTEL మాదిరిగానే English & Telugu ముఖ్యంగా, ఇతర భాషలతో పాటు)
     selected_lang = st.selectbox(
         "Report Language / భాషను ఎంచుకోండి:",
         [
@@ -70,7 +76,6 @@ with st.sidebar:
     
     st.divider()
     
-    # Free Launch Offer vs Paid Pro Plan Logic
     if FREE_LAUNCH_MODE:
         st.success("🎉 **FREE LAUNCH OFFER!**\nAll Pro features & PDF downloads are 100% FREE for a limited time!")
         is_pro = True
@@ -113,14 +118,14 @@ if st.button("Generate Free Growth Report 🔍", type="primary"):
             prompt = f"""
             Act as an expert Global & Regional Social Media Growth Strategist. Analyze this creator profile:
             Platform: {platform}
-            Profile: {handle}
-            Niche: {niche}
+            Profile/Video Link: {handle}
+            Niche: {niche if niche else 'General Content Creation'}
             Target Audience Scope: {audience_type}
             Output Language: {selected_lang}
 
             Provide a comprehensive, actionable A-to-Z growth report strictly in {selected_lang}.
             Structure the report with these sections:
-            1. **Profile & Bio Optimization** (Tailored for {audience_type}).
+            1. **Profile & Content Optimization** (Tailored for {audience_type}).
             2. **3 Viral Content & Hook Ideas** (Culturally relevant to the target audience).
             3. **SEO, Keywords & Hashtag Strategy** (Mix of local/regional and global trending tags).
             4. **Best Posting Times & Consistency Plan**.
@@ -131,14 +136,20 @@ if st.button("Generate Free Growth Report 🔍", type="primary"):
             
             report = generate_with_rotation(prompt)
             
-            st.success("✅ Your Custom Growth Report is Ready!")
-            st.markdown(report)
-            
-            if is_pro:
-                pdf_bytes = create_pdf(report, platform, handle)
-                st.download_button(
-                    label="📥 Download Full Report as PDF (Free Launch Gift)",
-                    data=pdf_bytes,
-                    file_name=f"{handle}_CreatorPulse_Report.pdf",
-                    mime="application/pdf"
-                )
+            if report.startswith("⚠️"):
+                st.error(report)
+            else:
+                st.success("✅ Your Custom Growth Report is Ready!")
+                st.markdown(report)
+                
+                if is_pro:
+                    try:
+                        pdf_bytes = create_pdf(report, platform, handle)
+                        st.download_button(
+                            label="📥 Download Full Report as PDF (Free Launch Gift)",
+                            data=pdf_bytes,
+                            file_name="CreatorPulse_Growth_Report.pdf",
+                            mime="application/pdf"
+                        )
+                    except Exception as pdf_err:
+                        st.warning(f"PDF download skipped: {pdf_err}")
