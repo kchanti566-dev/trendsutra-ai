@@ -54,11 +54,6 @@ with col_title:
       " [AIENGTEL.com](https://aiengtel.com)**"
   )
 
-st.markdown(
-    "**A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powered by"
-    " [AIENGTEL.com](https://aiengtel.com)**"
-)
-
 st.info(
     "🎁 **Special Launch Access:** Enjoy unlimited real-data AI Growth Audits"
     " for free!"
