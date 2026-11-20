@@ -6,7 +6,7 @@ from googleapiclient.discovery import build
 import requests
 import streamlit as st
 
-st.set_page_config(page_title="TrendSutra AI - Growth Analyzer", page_icon="🚀", layout="wide")
+st.set_page_config(page_title="TrendSutra AI - Growth Analyzer", page_icon="logo.png", layout="wide")
 
 GEMINI_KEYS = [st.secrets.get("GEMINI_API_KEY", ""), st.secrets.get("GEMINI_API_KEY_2", "")]
 GEMINI_KEYS = [k for k in GEMINI_KEYS if k]
