@@ -1,5 +1,7 @@
 import streamlit as st
 from google import genai
+import requests
+import re
 from fpdf import FPDF
 
 # ==========================================
@@ -14,8 +16,33 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Gemini API Auto-Rotation Function (Updated to gemini-3.8-flash)
-def generate_with_rotation(prompt):
+# 2. Fast YouTube Video/Channel Info Fetcher (1 సెకనులో డేటా తెస్తుంది)
+def get_youtube_context(url_or_handle):
+    yt_key = st.secrets.get("YOUTUBE_API_KEY")
+    if not yt_key:
+        return ""
+    try:
+        # వీడియో ID తీయడం (youtu.be లేదా youtube.com లింక్ నుండి)
+        vid_match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url_or_handle)
+        if vid_match:
+            video_id = vid_match.group(1)
+            api_url = f"https://googleapis.com{video_id}&key={yt_key}"
+            res = requests.get(api_url, timeout=4).json()
+            if res.get("items"):
+                item = res["items"][0]
+                snippet = item["snippet"]
+                stats = item["statistics"]
+                return (
+                    f"Real Video Title: {snippet.get('title')} | "
+                    f"Channel: {snippet.get('channelTitle')} | "
+                    f"Views: {stats.get('viewCount', 'N/A')}, Likes: {stats.get('likeCount', 'N/A')}"
+                )
+    except Exception:
+        pass
+    return ""
+
+# 3. Ultra-Fast Gemini API Auto-Rotation Function
+def generate_fast_report(prompt):
     api_keys = [
         st.secrets.get("GEMINI_API_KEY"),
         st.secrets.get("GEMINI_API_KEY_2")
@@ -23,29 +50,23 @@ def generate_with_rotation(prompt):
     api_keys = [k for k in api_keys if k]
     
     if not api_keys:
-        return "⚠️ API Key కనుగొనబడలేదు! దయచేసి Streamlit Cloud -> Settings -> Secrets లో GEMINI_API_KEY ని యాడ్ చేయండి."
+        return "⚠️ API Key కనుగొనబడలేదు! Streamlit Secrets లో GEMINI_API_KEY ని యాడ్ చేయండి."
 
-    models_to_try = ["gemini-3.8-flash", "gemini-3.0-flash", "gemini-2.5-flash"]
     last_error = ""
-
     for key in api_keys:
-        client = genai.Client(api_key=key)
-        for model_name in models_to_try:
-            try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                )
-                return response.text
-            except Exception as e:
-                last_error = str(e)
-                if "NOT_FOUND" in last_error or "404" in last_error:
-                    continue # తర్వాతి మోడల్ పేరు ప్రయత్నిస్తుంది
-                else:
-                    break # కీ లిమిట్ అయిపోతే రెండో API కీకి మారుతుంది
+        try:
+            client = genai.Client(api_key=key)
+            response = client.models.generate_content(
+                model="gemini-3.8-flash",
+                contents=prompt,
+            )
+            return response.text
+        except Exception as e:
+            last_error = str(e)
+            continue
     return f"⚠️ API Error: {last_error}"
 
-# 3. Safe PDF Generation Function
+# 4. Safe PDF Generation Function
 def create_pdf(report_text, platform, username):
     pdf = FPDF()
     pdf.add_page()
@@ -57,7 +78,7 @@ def create_pdf(report_text, platform, username):
     pdf.multi_cell(0, 8, text=clean_text)
     return bytes(pdf.output())
 
-# 4. Sidebar - Global & Regional Settings + AIENGTEL Branding
+# 5. Sidebar - Global & Regional Settings + AIENGTEL Branding
 with st.sidebar:
     st.title("🌍 Global & Regional Settings")
     
@@ -100,7 +121,7 @@ with st.sidebar:
     st.markdown("### 🔗 Explore More AI Tools")
     st.markdown("Discover 100+ Best AI Tools in **English & తెలుగు** at **[AIENGTEL.com](https://aiengtel.com)** 🚀")
 
-# 5. Main App Interface
+# 6. Main App Interface
 st.title("🚀 CreatorPulse AI")
 st.markdown("##### A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powered by **[AIENGTEL.com](https://aiengtel.com)**")
 
@@ -111,50 +132,51 @@ col1, col2, col3 = st.columns(3)
 with col1:
     platform = st.selectbox("Select Platform:", ["YouTube", "Instagram", "TikTok"])
 with col2:
-    handle = st.text_input("Channel / Profile Username:", placeholder="@username or link")
+    handle = st.text_input("Channel / Profile / Video Link:", placeholder="@username or video link")
 with col3:
     niche = st.text_input("Content Niche / Category:", placeholder="e.g., Tech, Vlogs, Cooking, Gaming")
 
 if st.button("Generate Free Growth Report 🔍", type="primary"):
     if not handle:
-        st.warning("Please enter a valid username or channel link!")
+        st.warning("Please enter a valid username or link!")
     else:
-        with st.spinner(f"Analyzing {handle} for {audience_type} in {selected_lang}..."):
-            prompt = f"""
-            Act as an expert Global & Regional Social Media Growth Strategist. Analyze this creator profile:
-            Platform: {platform}
-            Profile/Video Link: {handle}
-            Niche: {niche if niche else 'General Content Creation'}
-            Target Audience Scope: {audience_type}
-            Output Language: {selected_lang}
-
-            Provide a comprehensive, actionable A-to-Z growth report strictly in {selected_lang}.
-            Structure the report with these sections:
-            1. **Profile & Content Optimization** (Tailored for {audience_type}).
-            2. **3 Viral Content & Hook Ideas** (Culturally relevant to the target audience).
-            3. **SEO, Keywords & Hashtag Strategy** (Mix of local/regional and global trending tags).
-            4. **Best Posting Times & Consistency Plan**.
-            5. **Monetization & Brand Deal Roadmap**.
+        with st.spinner("⚡ Generating fast AI Growth Report..."):
+            live_data = get_youtube_context(handle) if platform == "YouTube" else ""
             
-            Make it practical, encouraging, and easy to read with bullet points.
+            prompt = f"""
+            Act as an expert Social Media Growth Strategist. Give a crisp, high-impact A-to-Z growth report strictly in {selected_lang}.
+            Platform: {platform}
+            Input Link/Handle: {handle}
+            {live_data}
+            Niche: {niche if niche else 'General'}
+            Target Audience: {audience_type}
+
+            Keep each section concise (3-4 bullet points max per section) for fast reading:
+            1. **Profile / Video Audit & Optimization**
+            2. **3 Viral Hook & Content Ideas**
+            3. **SEO Keywords & Hashtags**
+            4. **Best Posting Time & Growth Hack**
+            5. **Monetization Tip**
             """
             
-            report = generate_with_rotation(prompt)
+            report = generate_fast_report(prompt)
             
             if report.startswith("⚠️"):
                 st.error(report)
             else:
-                st.success("✅ Your Custom Growth Report is Ready!")
+                st.success("✅ Report Generated!")
+                if live_data:
+                    st.caption(f"📊 Fetched Live Stats: {live_data}")
                 st.markdown(report)
                 
                 if is_pro:
                     try:
                         pdf_bytes = create_pdf(report, platform, handle)
                         st.download_button(
-                            label="📥 Download Full Report as PDF (Free Launch Gift)",
+                            label="📥 Download Report as PDF",
                             data=pdf_bytes,
-                            file_name="CreatorPulse_Growth_Report.pdf",
+                            file_name="CreatorPulse_Report.pdf",
                             mime="application/pdf"
                         )
-                    except Exception as pdf_err:
-                        st.warning(f"PDF download skipped: {pdf_err}")
+                    except Exception:
+                        pass
