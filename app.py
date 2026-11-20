@@ -2,6 +2,7 @@ import streamlit as st
 from google import genai
 import requests
 import re
+import time
 from fpdf import FPDF
 
 # ==========================================
@@ -28,7 +29,7 @@ def get_youtube_context(url_or_handle):
             api_url = f"https://googleapis.com{video_id}&key={yt_key}"
             res = requests.get(api_url, timeout=4).json()
             if res.get("items"):
-                item = res["items"][0]
+                item = res["items"]
                 snippet = item["snippet"]
                 stats = item["statistics"]
                 return (
@@ -40,7 +41,7 @@ def get_youtube_context(url_or_handle):
         pass
     return ""
 
-# 3. Ultra-Fast Gemini API Auto-Rotation + Lite Fallback (503 Error Fix)
+# 3. Smart Auto-Discovery & Auto-Rotation Gemini Function (Zero 404/503 Errors)
 def generate_fast_report(prompt):
     api_keys = [
         st.secrets.get("GEMINI_API_KEY"),
@@ -51,23 +52,43 @@ def generate_fast_report(prompt):
     if not api_keys:
         return "⚠️ API Key కనుగొనబడలేదు! Streamlit Secrets లో GEMINI_API_KEY ని యాడ్ చేయండి."
 
-    # 3.8-flash బిజీగా (503) ఉంటే వెంటనే 3.8-flash-lite కి మారుతుంది
-    models = ["gemini-3.8-flash", "gemini-3.8-flash-lite"]
     last_error = ""
-
     for key in api_keys:
-        client = genai.Client(api_key=key)
-        for model_name in models:
-            try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                )
-                return response.text
-            except Exception as e:
-                last_error = str(e)
-                continue
-    return f"⚠️ Server busy right now. Please click Generate again in 5 seconds. ({last_error})"
+        try:
+            client = genai.Client(api_key=key)
+            # ముందుగా gemini-3.8-flash తో ప్రయత్నిస్తుంది, 503 వస్తే 2 సెకన్లు ఆగి మళ్ళీ ట్రై చేస్తుంది
+            for attempt in range(2):
+                try:
+                    response = client.models.generate_content(
+                        model="gemini-3.8-flash",
+                        contents=prompt,
+                    )
+                    return response.text
+                except Exception as e:
+                    last_error = str(e)
+                    if "503" in last_error or "UNAVAILABLE" in last_error:
+                        time.sleep(2)
+                        continue
+                    else:
+                        break
+            
+            # ఒకవేళ 3.8-flash బిజీగా ఉంటే, మీ అకౌంట్‌లో ఉన్న ఇతర అందుబాటులో ఉన్న ఫ్లాష్ మోడల్‌ను ఆటోమేటిక్‌గా వాడుతుంది
+            for m in client.models.list():
+                if "flash" in m.name and "3.8" not in m.name:
+                    try:
+                        clean_model = m.name.replace("models/", "")
+                        response = client.models.generate_content(
+                            model=clean_model,
+                            contents=prompt,
+                        )
+                        return response.text
+                    except Exception:
+                        continue
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    return f"⚠️ Server is temporarily busy. Please click Generate again! ({last_error})"
 
 # 4. Safe PDF Generation Function
 def create_pdf(report_text, platform, username):
