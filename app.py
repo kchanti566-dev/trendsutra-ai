@@ -1,263 +1,190 @@
 import re
+import time
+from google import genai
+from googleapiclient.discovery import build
 import requests
 import streamlit as st
-from google import genai
-from google.genai import types
 
 st.set_page_config(
-    page_title="TrendSutra AI | Growth Analyzer",
-    page_icon="📈",
-    layout="wide",
+    page_title="CreatorPulse AI - Growth Analyzer", page_icon="🚀", layout="wide"
+)
+st.title("🚀 YouTube, Instagram & TikTok AI (A to Z Growth Analyzer)")
+st.write(
+    "ఏదైనా వీడియో లింక్ ఇవ్వండి—ప్రేక్షకుల నాడి, వైరల్ ఐడియాలు, మరియు ఆదాయ"
+    " మార్గాలను AI చెప్తుంది!"
+)
+
+# రెండు Gemini API కీలు (ఒకటి అయిపోతే రెండోది ఆటోమేటిక్‌గా పనిచేస్తుంది)
+GEMINI_KEYS = [
+    st.secrets["GEMINI_API_KEY"],
+    st.secrets["GEMINI_API_KEY_2"],
+]
+YOUTUBE_KEY = st.secrets["YOUTUBE_API_KEY"]
+RAPIDAPI_KEY = st.secrets["RAPIDAPI_API_KEY"]
+
+output_lang = st.selectbox(
+    "రిపోర్ట్ ఏ భాషలో కావాలి?", ["Telugu (తెలుగు)", "Tenglish", "English"]
 )
 
 
-def get_gemini_keys():
-    keys = []
-    if "GEMINI_API_KEYS" in st.secrets:
-        val = st.secrets["GEMINI_API_KEYS"]
-        if isinstance(val, list):
-            keys.extend([str(k).strip() for k in val if k and str(k).strip()])
-        elif isinstance(val, str):
-            keys.extend([k.strip() for k in val.split(",") if k.strip()])
-    if "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
-        single_key = str(st.secrets["GEMINI_API_KEY"]).strip()
-        if single_key and single_key not in keys:
-            keys.append(single_key)
-    return keys
+def extract_video_id(url):
+  pattern = r"(?:v=|\/|live\/)([0-9A-Za-z_-]{11}).*"
+  match = re.search(pattern, url)
+  return match.group(1) if match else None
 
 
-def extract_video_id(text: str):
-    patterns = [
-        r"(?:v=|/v/|youtu\.be/|/shorts/|/live/)([A-Za-z0-9_-]{11})",
-    ]
-    for p in patterns:
-        m = re.search(p, text)
-        if m:
-            return m.group(1)
-    return None
-
-
-def _extract_output_text(res) -> str:
-    if not res:
-        return ""
-    if getattr(res, "text", None) and str(res.text).strip():
-        return str(res.text).strip()
-    outputs = getattr(res, "outputs", None) or []
-    parts = []
-    for item in outputs:
-        t = getattr(item, "text", None)
-        if t:
-            parts.append(str(t))
-    return "\n".join(parts).strip()
-
-
-def generate_with_rotation(prompt: str) -> str:
-    keys = get_gemini_keys()
-    if not keys:
-        return "❌ Streamlit Secrets లో Gemini API Key లేదు. దయచేసి యాడ్ చేయండి."
-
-    if "gemini_key_idx" not in st.session_state:
-        st.session_state.gemini_key_idx = 0
-
-    total = len(keys)
-    errors = []
-
-    for attempt in range(total):
-        idx = (st.session_state.gemini_key_idx + attempt) % total
-        api_key = keys[idx]
-        try:
-            client = genai.Client(
-                api_key=api_key,
-                http_options=types.HttpOptions(timeout=15000),
-            )
-
-            # 1) Try Interactions API with gemini-3.8-flash
-            try:
-                inter = client.interactions.create(
-                    model="gemini-3.8-flash",
-                    input=prompt,
-                )
-                out = _extract_output_text(inter)
-                if out:
-                    st.session_state.gemini_key_idx = (idx + 1) % total
-                    return out
-            except Exception as e_inter:
-                errors.append(f"Key#{idx+1} [interactions gemini-3.8-flash]: {e_inter}")
-
-            # 2) Try generate_content with gemini-3.8-flash
-            try:
-                resp = client.models.generate_content(
-                    model="gemini-3.8-flash",
-                    contents=prompt,
-                )
-                out = _extract_output_text(resp)
-                if out:
-                    st.session_state.gemini_key_idx = (idx + 1) % total
-                    return out
-            except Exception as e_gc:
-                errors.append(f"Key#{idx+1} [generate_content gemini-3.8-flash]: {e_gc}")
-
-            # 3) Auto-discover first available flash model for this key
-            try:
-                avail_models = []
-                for m in client.models.list():
-                    m_name = getattr(m, "name", "")
-                    if "flash" in m_name.lower():
-                        avail_models.append(m_name)
-                for m_name in avail_models[:2]:
-                    try:
-                        resp_m = client.models.generate_content(
-                            model=m_name,
-                            contents=prompt,
-                        )
-                        out_m = _extract_output_text(resp_m)
-                        if out_m:
-                            st.session_state.gemini_key_idx = (idx + 1) % total
-                            return out_m
-                    except Exception as e_m:
-                        errors.append(f"Key#{idx+1} [{m_name}]: {e_m}")
-            except Exception as e_list:
-                errors.append(f"Key#{idx+1} [models.list]: {e_list}")
-
-        except Exception as e_client:
-            errors.append(f"Key#{idx+1} [client]: {e_client}")
-
-    return "❌ రిపోర్ట్ జనరేట్ కాలేదు. వివరాలు:\n- " + "\n- ".join(errors[-4:])
-
-
-def fetch_youtube_stats(user_input: str) -> str:
-    yt_key = st.secrets.get("YOUTUBE_API_KEY", "")
-    if not yt_key:
-        return f"YouTube Input: {user_input}"
-
-    vid_id = extract_video_id(user_input)
-    try:
-        if vid_id:
-            v_url = "https://www.googleapis.com/youtube/v3/videos"
-            v_res = requests.get(
-                v_url,
-                params={"part": "snippet,statistics", "id": vid_id, "key": yt_key},
-                timeout=8,
-            ).json()
-            items = v_res.get("items", [])
-            if items:
-                sn = items[0].get("snippet", {})
-                st_data = items[0].get("statistics", {})
-                return (
-                    f"Video Title: {sn.get('title', 'N/A')}\n"
-                    f"Channel: {sn.get('channelTitle', 'N/A')}\n"
-                    f"Views: {st_data.get('viewCount', 'N/A')} | Likes: {st_data.get('likeCount', 'N/A')} | Comments: {st_data.get('commentCount', 'N/A')}\n"
-                    f"Tags: {', '.join(sn.get('tags', [])[:10])}"
-                )
-
-        search_url = "https://www.googleapis.com/youtube/v3/search"
-        r = requests.get(
-            search_url,
-            params={
-                "part": "snippet",
-                "q": user_input,
-                "type": "channel",
-                "maxResults": 1,
-                "key": yt_key,
-            },
-            timeout=8,
-        ).json()
-        items = r.get("items", [])
-        if not items:
-            return f"Input/Query: {user_input}"
-
-        ch = items[0]
-        ch_id = ch["id"]["channelId"]
-        title = ch["snippet"]["title"]
-        desc = ch["snippet"].get("description", "")
-
-        s_res = requests.get(
-            "https://www.googleapis.com/youtube/v3/channels",
-            params={"part": "statistics", "id": ch_id, "key": yt_key},
-            timeout=8,
-        ).json()
-        stats = s_res.get("items", [{}])[0].get("statistics", {})
-
-        return (
-            f"Channel: {title}\n"
-            f"Subscribers: {stats.get('subscriberCount', 'Hidden/N/A')}\n"
-            f"Total Views: {stats.get('viewCount', 'N/A')}\n"
-            f"Total Videos: {stats.get('videoCount', 'N/A')}\n"
-            f"Description: {desc[:250]}"
+def get_youtube_data(video_id):
+  youtube = build("youtube", "v3", developerKey=YOUTUBE_KEY)
+  vid_response = (
+      youtube.videos().list(part="snippet,statistics", id=video_id).execute()
+  )
+  if not vid_response["items"]:
+    return None, None
+  snippet = vid_response["items"][0]["snippet"]
+  stats = vid_response["items"][0]["statistics"]
+  video_info = {
+      "title": snippet["title"],
+      "description": snippet["description"][:1000],
+      "tags": snippet.get("tags", []),
+      "views": stats.get("viewCount", "0"),
+      "likes": stats.get("likeCount", "0"),
+      "comment_count": stats.get("commentCount", "0"),
+  }
+  comments = []
+  try:
+    com_response = (
+        youtube.commentThreads()
+        .list(
+            part="snippet",
+            videoId=video_id,
+            maxResults=50,
+            order="relevance",
+            textFormat="plainText",
         )
-    except Exception as e:
-        return f"YouTube lookup note: {e} | Input: {user_input}"
-
-
-def fetch_rapidapi_info(platform: str, username: str) -> str:
-    rapid_key = st.secrets.get("RAPIDAPI_API_KEY", "")
-    clean_user = username.lstrip("@").strip()
-    if not rapid_key:
-        return f"{platform} Handle/Niche: @{clean_user}"
-    try:
-        if platform == "Instagram":
-            url = "https://instagram-scraper-stable-api.p.rapidapi.com/ig_get_fb_profile_hover.php"
-            headers = {
-                "x-rapidapi-key": rapid_key,
-                "x-rapidapi-host": "instagram-scraper-stable-api.p.rapidapi.com",
-            }
-            resp = requests.get(
-                url,
-                headers=headers,
-                params={"username_or_url": clean_user},
-                timeout=8,
-            )
-            return f"Instagram Data (@{clean_user}): {resp.text[:800]}"
-        return f"TikTok Handle/Niche: @{clean_user}"
-    except Exception as e:
-        return f"{platform} lookup note: {e} | @{clean_user}"
-
-
-st.title("📈 TrendSutra AI")
-st.caption("YouTube, Instagram & TikTok A to Z Growth Analyzer • 100% Free Access")
-
-with st.sidebar:
-    st.header("⚙️ TrendSutra AI Controls")
-    platform = st.selectbox("ప్లాట్‌ఫామ్ ఎంచుకోండి", ["YouTube", "Instagram", "TikTok"])
-    target_input = st.text_input(
-        "ఛానెల్ పేరు / @Username / Link / Niche",
-        placeholder="ఉదా: @creator లేదా Tech Telugu",
+        .execute()
     )
-    goal = st.selectbox(
-        "ప్రధాన లక్ష్యం",
-        [
-            "A to Z Growth Audit",
-            "Viral Hook & Content Ideas",
-            "Algorithm & Retention Fix",
-            "Monetization Roadmap",
-        ],
-    )
-    keys_count = len(get_gemini_keys())
-    st.success(f"🔑 Active Gemini Keys: {keys_count} (Auto-Rotation Ready)")
+    for item in com_response["items"]:
+      comments.append(
+          item["snippet"]["topLevelComment"]["snippet"]["textDisplay"]
+      )
+  except Exception:
+    comments.append("కామెంట్లు ఆఫ్ చేసి ఉన్నాయి.")
+  return video_info, comments
 
-st.markdown("---")
 
-if st.button("🚀 Analyze Now", type="primary"):
-    if not target_input.strip():
-        st.warning("దయచేసి ఛానెల్ పేరు / @Username / Link లేదా Niche ఎంటర్ చేయండి.")
+def generate_ai_report(platform, data_text, lang):
+  prompt = f"""
+    నువ్వు ఒక టాప్ {platform} గ్రోత్ మరియు వైరల్ కంటెంట్ స్ట్రాటజిస్ట్‌వి.
+    క్రింది వీడియో డేటా మరియు కామెంట్లను లోతుగా విశ్లేషించి, {lang} భాషలో A to Z గ్రోత్ రిపోర్ట్ తయారు చెయ్యి:
+    డేటా: {data_text}
+    
+    ఈ 5 విభాగాలలో స్పష్టమైన సమాధానం ఇవ్వు:
+    1. 📊 ప్రేక్షకుల నాడి (Audience Sentiment & Top 5 Questions)
+    2. 🪝 వైరల్ హుక్ & తర్వాతి 3 వీడియో ఐడియాలు (టైటిల్ / థంబ్‌నెయిల్ / స్క్రిప్ట్ ఐడియాతో)
+    3. 💰 ఆదాయ మార్గం (Monetization / Product / Affiliate Idea)
+    4. 🔍 SEO, క్యాప్షన్ & హ్యాష్‌ట్యాగ్ మెరుగుదలలు
+    5. 🚀 ఎంగేజ్‌మెంట్ పెంచే ప్రో-టిప్
+    """
+  last_error = ""
+  for key in GEMINI_KEYS:
+    client = genai.Client(api_key=key)
+    for model_name in ["gemini-3.5-flash-lite", "gemini-3.8-flash"]:
+      try:
+        response = client.models.generate_content(
+            model=model_name, contents=prompt
+        )
+        return response.text
+      except Exception as e:
+        last_error = str(e)
+        continue
+  return f"⚠️ అన్ని API కీల పరిమితి పూర్తయింది: {last_error}"
+
+
+tab1, tab2, tab3 = st.tabs(["🎬 YouTube", "📱 Instagram Reels", "🎵 TikTok"])
+
+with tab1:
+  yt_url = st.text_input(
+      "🔗 YouTube వీడియో లింక్:", placeholder="https://youtu.be..."
+  )
+  if st.button("🚀 YouTube విశ్లేషణ ప్రారంభించు"):
+    if not yt_url:
+      st.error("దయచేసి YouTube లింక్ ఇవ్వండి.")
     else:
-        with st.spinner("TrendSutra AI వేగంగా విశ్లేషిస్తోంది..."):
-            if platform == "YouTube":
-                raw_data = fetch_youtube_stats(target_input.strip())
-            else:
-                raw_data = fetch_rapidapi_info(platform, target_input.strip())
-
-            prompt = (
-                f"You are TrendSutra AI. Give a crisp, practical growth report in Telugu "
-                f"(key English terms allowed). Keep it concise and actionable.\n"
-                f"Platform: {platform} | Input: {target_input.strip()} | Goal: {goal}\n"
-                f"Data: {raw_data}\n\n"
-                f"Sections:\n"
-                f"1. **Current Snapshot & Fixes**\n"
-                f"2. **Reach & Retention Strategy**\n"
-                f"3. **5 Viral Hook Ideas**\n"
-                f"4. **7-Day Action Steps**"
+      vid_id = extract_video_id(yt_url)
+      if not vid_id:
+        st.error("సరైన YouTube లింక్ ఇవ్వండి.")
+      else:
+        with st.spinner("YouTube డేటా సేకరిస్తోంది..."):
+          info, comments = get_youtube_data(vid_id)
+        if info:
+          c1, c2, c3 = st.columns(3)
+          c1.metric("👀 Views", info["views"])
+          c2.metric("👍 Likes", info["likes"])
+          c3.metric("💬 Comments", info["comment_count"])
+          with st.spinner("AI రిపోర్ట్ తయారు చేస్తోంది..."):
+            raw_data = (
+                f"Title: {info['title']}\nDesc:"
+                f" {info['description']}\nTags: {info['tags']}\nComments:"
+                f" {comments}"
             )
-            report = generate_with_rotation(prompt)
-            st.markdown("### 📊 TrendSutra AI Growth Report")
-            st.markdown(report)
+            st.markdown(generate_ai_report("YouTube", raw_data, output_lang))
+
+with tab2:
+  insta_url = st.text_input(
+      "🔗 Instagram Reel లింక్:", placeholder="https://instagram.com..."
+  )
+  if st.button("🔥 Instagram Reel విశ్లేషణ ప్రారంభించు"):
+    if not insta_url:
+      st.error("దయచేసి Instagram Reel లింక్ ఇవ్వండి.")
+    else:
+      with st.spinner("Instagram డేటా సేకరిస్తోంది..."):
+        fetched_text = f"Reel Link: {insta_url}\n"
+        try:
+          api_url = "https://rapidapi.com"
+          headers = {
+              "x-rapidapi-key": RAPIDAPI_KEY,
+              "x-rapidapi-host": (
+                  "://rapidapi.com"
+              ),
+          }
+          res = requests.get(
+              api_url,
+              headers=headers,
+              params={"reel_post_code_or_url": insta_url},
+              timeout=15,
+          )
+          if res.status_code == 200:
+            fetched_text += f"API Data: {str(res.json())[:3500]}"
+        except Exception:
+          pass
+      with st.spinner("AI Instagram రిపోర్ట్ తయారు చేస్తోంది..."):
+        st.markdown(
+            generate_ai_report("Instagram Reels", fetched_text, output_lang)
+        )
+
+with tab3:
+  tiktok_url = st.text_input(
+      "🔗 TikTok వీడియో లింక్:",
+      placeholder="https://tiktok.com...",
+  )
+  if st.button("🎵 TikTok విశ్లేషణ ప్రారంభించు"):
+    if not tiktok_url:
+      st.error("దయచేసి TikTok లింక్ ఇవ్వండి.")
+    else:
+      with st.spinner("TikTok డేటా సేకరిస్తోంది..."):
+        fetched_tt = f"TikTok Link: {tiktok_url}\n"
+        try:
+          tt_api = "https://rapidapi.com"
+          headers = {
+              "x-rapidapi-key": RAPIDAPI_KEY,
+              "x-rapidapi-host": "://rapidapi.com",
+          }
+          res = requests.get(
+              tt_api, headers=headers, params={"url": tiktok_url}, timeout=15
+          )
+          if res.status_code == 200:
+            fetched_tt += f"API Data: {str(res.json())[:3500]}"
+        except Exception:
+          pass
+      with st.spinner("AI TikTok రిపోర్ట్ తయారు చేస్తోంది..."):
+        st.markdown(generate_ai_report("TikTok", fetched_tt, output_lang))
