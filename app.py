@@ -1,228 +1,169 @@
 import streamlit as st
-import google.generativeai as genai
 import requests
-import re
-from urllib.parse import urlparse, parse_qs
+from google import genai
 
-# --- PAGE CONFIGURATION ---
 st.set_page_config(
-    page_title="TrendSutra AI | Global Social Media Growth Analyzer",
-    page_icon="🚀",
-    layout="wide"
+    page_title="TrendSutra AI | Growth Analyzer",
+    page_icon="📈",
+    layout="wide",
 )
 
-# --- CUSTOM CSS FOR MODERN GLOBAL LOOK ---
-st.markdown("""
-    <style>
-    .main-title {
-        font-size: 2.8rem;
-        font-weight: 800;
-        background: -webkit-linear-gradient(45deg, #FF4B2B, #FF416C, #7F00FF);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0px;
-    }
-    .sub-title {
-        font-size: 1.1rem;
-        color: #555;
-        margin-bottom: 20px;
-    }
-    .badge {
-        background-color: #e6f4ea;
-        color: #137333;
-        padding: 4px 12px;
-        border-radius: 15px;
-        font-weight: 600;
-        font-size: 0.85rem;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# --- HEADER ---
-st.markdown('<p class="main-title">🚀 TrendSutra AI</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">A-to-Z Global Viral Growth Analyzer for YouTube, Instagram & TikTok <span class="badge">✨ 100% Free Early Access</span></p>', unsafe_allow_html=True)
-
-# --- API KEYS & AUTO-ROTATION SETUP ---
+# --- Secrets Loader (Supports list or single key) ---
 def get_gemini_keys():
     keys = []
-    # 2 కీలు ఉంటే రెండింటినీ తీసుకుంటుంది, లేదంటే ఉన్న ఒక్క కీని వాడుతుంది
-    if "GEMINI_API_KEY_1" in st.secrets:
-        keys.append(st.secrets["GEMINI_API_KEY_1"])
-    if "GEMINI_API_KEY_2" in st.secrets:
-        keys.append(st.secrets["GEMINI_API_KEY_2"])
-    if "GEMINI_API_KEY" in st.secrets and not keys:
-        keys.append(st.secrets["GEMINI_API_KEY"])
+    if "GEMINI_API_KEYS" in st.secrets:
+        val = st.secrets["GEMINI_API_KEYS"]
+        if isinstance(val, list):
+            keys.extend([k.strip() for k in val if k and k.strip()])
+        elif isinstance(val, str):
+            keys.extend([k.strip() for k in val.split(",") if k.strip()])
+    if "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
+        single_key = st.secrets["GEMINI_API_KEY"].strip()
+        if single_key not in keys:
+            keys.append(single_key)
     return keys
 
-def generate_ai_analysis(prompt):
+def generate_with_rotation(prompt: str, model_name: str = "gemini-2.5-flash") -> str:
     keys = get_gemini_keys()
     if not keys:
-        return "⚠️ Error: Gemini API Keys not found in Streamlit Secrets."
-    
-    for index, api_key in enumerate(keys):
+        return "❌ Streamlit Secrets లో Gemini API Key లేదు. దయచేసి యాడ్ చేయండి."
+
+    # Session state rotation index
+    if "gemini_key_idx" not in st.session_state:
+        st.session_state.gemini_key_idx = 0
+
+    total = len(keys)
+    last_error = None
+
+    for attempt in range(total):
+        idx = (st.session_state.gemini_key_idx + attempt) % total
+        api_key = keys[idx]
         try:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(prompt)
+            client = genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+            )
+            # Success -> next call starts after working key
+            st.session_state.gemini_key_idx = (idx + 1) % total
             return response.text
         except Exception as e:
-            # మొదటి కీ లిమిట్ అయిపోతే ఆటోమేటిక్ గా రెండో కీకి మారుతుంది
-            if index < len(keys) - 1:
-                continue
-            else:
-                return f"⚠️ All API keys reached rate limit or encountered an error: {str(e)}"
+            last_error = str(e)
+            continue
 
-# --- VIDEO METADATA EXTRACTORS ---
-def extract_youtube_id(url):
-    parsed_url = urlparse(url)
-    if parsed_url.hostname == 'youtu.be':
-        return parsed_url.path[1:]
-    if parsed_url.hostname in ('://youtube.com', 'youtube.com'):
-        if parsed_url.path == '/watch':
-            return parse_qs(parsed_url.query)['v'][0]
-        if parsed_url.path[:7] == '/embed/':
-            return parsed_url.path.split('/')[2]
-        if parsed_url.path[:3] == '/v/':
-            return parsed_url.path.split('/')[2]
-        if parsed_url.path[:8] == '/shorts/':
-            return parsed_url.path.split('/')[2]
-    return None
+    return f"❌ అన్ని Gemini API Keys విఫలమయ్యాయి. చివరి లోపం: {last_error}"
 
-def get_youtube_data(video_url):
-    video_id = extract_youtube_id(video_url)
-    if not video_id:
-        return None, "Invalid YouTube URL."
-    
+# --- Platform Data Fetchers ---
+def fetch_youtube_stats(channel_or_query: str) -> str:
     yt_key = st.secrets.get("YOUTUBE_API_KEY", "")
     if not yt_key:
-        return None, "YouTube API Key missing in Secrets."
-        
-    api_url = f"https://googleapis.com{video_id}&key={yt_key}"
-    res = requests.get(api_url).json()
-    
-    if "items" in res and len(res["items"]) > 0:
-        item = res["items"][0]
-        snippet = item["snippet"]
-        stats = item["statistics"]
-        data = {
-            "platform": "YouTube",
-            "title": snippet.get("title", ""),
-            "description": snippet.get("description", "")[:1000],
-            "channel": snippet.get("channelTitle", ""),
-            "tags": ", ".join(snippet.get("tags", [])[:15]),
-            "views": stats.get("viewCount", "N/A"),
-            "likes": stats.get("likeCount", "N/A"),
-            "comments": stats.get("commentCount", "N/A")
+        return "YouTube API Key missing in Secrets."
+    try:
+        search_url = "https://www.googleapis.com/youtube/v3/search"
+        params = {
+            "part": "snippet",
+            "q": channel_or_query,
+            "type": "channel",
+            "maxResults": 1,
+            "key": yt_key,
         }
-        return data, None
-    return None, "Video not found or private."
+        r = requests.get(search_url, params=params, timeout=15).json()
+        items = r.get("items", [])
+        if not items:
+            return f"'{channel_or_query}' కోసం YouTube ఛానెల్ దొరకలేదు."
 
-def get_social_data_via_rapidapi(video_url, platform):
+        ch = items[0]
+        ch_id = ch["id"]["channelId"]
+        title = ch["snippet"]["title"]
+        desc = ch["snippet"].get("description", "")
+
+        stats_url = "https://www.googleapis.com/youtube/v3/channels"
+        s_params = {"part": "statistics", "id": ch_id, "key": yt_key}
+        s_res = requests.get(stats_url, params=s_params, timeout=15).json()
+        stats = s_res.get("items", [{}])[0].get("statistics", {})
+
+        return (
+            f"Channel: {title} (ID: {ch_id})\n"
+            f"Subscribers: {stats.get('subscriberCount', 'Hidden/N/A')}\n"
+            f"Total Views: {stats.get('viewCount', 'N/A')}\n"
+            f"Total Videos: {stats.get('videoCount', 'N/A')}\n"
+            f"Description: {desc[:300]}"
+        )
+    except Exception as e:
+        return f"YouTube fetch error: {e}"
+
+def fetch_rapidapi_info(platform: str, username: str) -> str:
     rapid_key = st.secrets.get("RAPIDAPI_API_KEY", "")
     if not rapid_key:
-        return {"platform": platform, "url": video_url, "note": "Analyzing based on URL structure and platform trends."}, None
-    
-    # గమనిక: మీ RapidAPI సబ్‌స్క్రిప్షన్ హోస్ట్ ప్రకారం URL పనిచేస్తుంది. ఫెయిల్ అయినా AI URL ఆధారంగా అనాలిసిస్ ఇస్తుంది.
-    return {
-        "platform": platform,
-        "url": video_url,
-        "title": f"{platform} Video Content",
-        "description": f"Analyze this {platform} video link: {video_url}"
-    }, None
+        return f"{platform} కోసం RapidAPI Key లేదు. యూజర్ ఇచ్చిన హ్యాండిల్ ఆధారంగా విశ్లేషించండి: @{username}"
 
-# --- MAIN UI INPUTS ---
-col1, col2 = st.columns([3, 1])
+    clean_user = username.lstrip("@").strip()
+    try:
+        if platform == "Instagram":
+            url = "https://instagram-scraper-stable-api.p.rapidapi.com/ig_get_fb_profile_hover.php"
+            headers = {
+                "x-rapidapi-key": rapid_key,
+                "x-rapidapi-host": "instagram-scraper-stable-api.p.rapidapi.com",
+            }
+            resp = requests.get(url, headers=headers, params={"username_or_url": clean_user}, timeout=15)
+            return f"Instagram Raw Data (@{clean_user}): {resp.text[:1200]}"
+        else:
+            return f"TikTok Handle: @{clean_user} (AI Growth Analysis Mode)"
+    except Exception as e:
+        return f"{platform} API error: {e} | Handle: @{clean_user}"
 
-with col1:
-    video_url = st.text_input("🔗 Paste Video Link (YouTube, Shorts, Instagram Reels, or TikTok):", placeholder="https://://youtube.com/watch?v=...")
+# --- UI Header ---
+st.title("📈 TrendSutra AI")
+st.caption("YouTube, Instagram & TikTok A to Z Growth Analyzer • 100% Free Access")
 
-with col2:
-    target_language = st.selectbox(
-        "🌐 Output Language:",
-        [
-            "Auto-Detect (Match Video Language)",
-            "English",
-            "తెలుగు (Telugu)",
-            "हिन्दी (Hindi)",
-            "தமிழ் (Tamil)",
-            "Español (Spanish)",
-            "Français (French)",
-            "العربية (Arabic)",
-            "Português (Portuguese)",
-            "Deutsch (German)",
-            "日本語 (Japanese)",
-            "한국어 (Korean)"
-        ]
+with st.sidebar:
+    st.header("⚙️ TrendSutra AI Controls")
+    platform = st.selectbox("ప్లాట్‌ఫామ్ ఎంచుకోండి", ["YouTube", "Instagram", "TikTok"])
+    target_input = st.text_input(
+        "ఛానెల్ పేరు / @Username / Niche",
+        placeholder="ఉదా: @creator లేదా Tech Telugu",
     )
+    goal = st.selectbox(
+        "ప్రధాన లక్ష్యం",
+        [
+            "A to Z Growth Audit",
+            "Viral Hook & Content Ideas",
+            "Algorithm & Retention Fix",
+            "Monetization Roadmap",
+        ],
+    )
+    keys_count = len(get_gemini_keys())
+    st.success(f"🔑 Active Gemini Keys: {keys_count} (Auto-Rotation Ready)")
 
-analyze_btn = st.button("⚡ Generate A-to-Z Viral Analysis", type="primary", use_container_width=True)
-
-# --- ANALYSIS EXECUTION ---
-if analyze_btn:
-    if not video_url.strip():
-        st.warning("Please paste a valid video URL first!")
-    else:
-        with st.spinner("🔍 Extracting video signals & generating localized A-to-Z strategy..."):
-            video_data = None
-            error_msg = None
-            
-            # Platform Detection
-            if "youtube.com" in video_url or "youtu.be" in video_url:
-                video_data, error_msg = get_youtube_data(video_url)
-            elif "instagram.com" in video_url:
-                video_data, error_msg = get_social_data_via_rapidapi(video_url, "Instagram")
-            elif "tiktok.com" in video_url:
-                video_data, error_msg = get_social_data_via_rapidapi(video_url, "TikTok")
-            else:
-                video_data = {"platform": "Social Media", "url": video_url}
-
-            if error_msg:
-                st.error(error_msg)
-            else:
-                # Language Instruction Logic
-                if target_language == "Auto-Detect (Match Video Language)":
-                    lang_instruction = (
-                        "CRITICAL LANGUAGE RULE: Detect the exact language used in the video's Title, Description, or Tags. "
-                        "Write the ENTIRE A-to-Z analysis report in that SAME detected language! "
-                        "(For example, if the title is in Telugu, write in Telugu; if Spanish, write in Spanish; if Hindi, write in Hindi; if English, write in English)."
-                    )
-                else:
-                    lang_instruction = f"CRITICAL LANGUAGE RULE: Write the ENTIRE A-to-Z analysis report strictly in {target_language}."
-
-                prompt = f"""
-                You are 'TrendSutra AI', an elite global social media growth strategist and viral content algorithm expert.
-                
-                {lang_instruction}
-                
-                Analyze the following video data and provide a comprehensive **A-to-Z Growth & Viral Audit**:
-                
-                **Video Metadata:**
-                {video_data}
-                
-                Structure the report clearly with emojis and bullet points covering:
-                1. 🎯 **Hook & First 3 Seconds Audit** (How to stop the scroll immediately)
-                2. 📊 **Performance & Engagement Breakdown** (Analyze views/likes ratio or viral potential)
-                3. ✍️ **3 High-CTR Viral Title / Caption Alternatives**
-                4. 🖼️ **Thumbnail / Visual Cover Psychology** (What colors, text, or emotions to use)
-                5. 🔍 **SEO, Keywords & Hashtag Strategy** (Low competition, high search volume tags)
-                6. 🧠 **Audience Retention & Pacing Hacks** (Where viewers might drop off and how to fix it)
-                7. 💰 **Monetization & Call-To-Action (CTA) Blueprint** (How to convert viewers into followers/buyers)
-                8. 🚀 **Next 3 Viral Video Ideas** (Based on this exact niche)
-                
-                Keep the tone encouraging, actionable, and tailored for creators.
-                """
-                
-                report = generate_ai_analysis(prompt)
-                
-                st.success("✅ A-to-Z Growth Blueprint Ready!")
-                st.markdown("---")
-                st.markdown(report)
-
-# --- FOOTER ---
 st.markdown("---")
-st.markdown(
-    "<div style='text-align: center; color: #888; font-size: 0.9rem;'>"
-    "Powered by <b>TrendSutra AI</b> | Built for Global Creators 🌍 | Discover more AI tools at <a href='https://aiengtel.com' target='_blank'>AIENGTEL.com</a>"
-    "</div>",
-    unsafe_allow_html=True
-)
+
+if st.button("🚀 Analyze Now", type="primary"):
+    if not target_input.strip():
+        st.warning("దయచేసి ఛానెల్ పేరు / @Username లేదా Niche ఎంటర్ చేయండి.")
+    else:
+        with st.spinner("TrendSutra AI డేటా సేకరించి విశ్లేషిస్తోంది..."):
+            if platform == "YouTube":
+                raw_data = fetch_youtube_stats(target_input.strip())
+            else:
+                raw_data = fetch_rapidapi_info(platform, target_input.strip())
+
+            prompt = f"""
+You are **TrendSutra AI**, an expert growth strategist for YouTube, Instagram, and TikTok.
+Respond clearly in simple, practical Telugu (with key English growth terms where helpful).
+
+Platform: {platform}
+Input: {target_input.strip()}
+Goal: {goal}
+
+Fetched Data:
+{raw_data}
+
+Provide a structured A to Z actionable report:
+1. **Current Snapshot & Diagnosis** (ప్రస్తుత స్థితి & లోపాలు)
+2. **Algorithm & Reach Boost Strategy** (రీచ్ పెంచే వ్యూహాలు)
+3. **7 Ready-to-Shoot Content / Hook Ideas** (వైరల్ అయ్యే 7 ఐడియాలు)
+4. **Next 7 Days Action Plan** (వచ్చే 7 రోజుల కార్యాచరణ)
+"""
+            report = generate_with_rotation(prompt)
+            st.markdown("### 📊 TrendSutra AI Growth Report")
+            st.markdown(report)
