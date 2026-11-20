@@ -1,266 +1,144 @@
-import re
-from fpdf import FPDF
-from google import genai
-from googleapiclient.discovery import build
-import requests
 import streamlit as st
+import google.generativeai as genai
+import requests
+from fpdf import FPDF
 
+# ==========================================
+# ⚙️ LAUNCH SETTINGS (Free Launch vs Paid Pro)
+# ==========================================
+FREE_LAUNCH_MODE = True  # కొన్ని రోజుల తర్వాత దీనిని False అని మారిస్తే Pro Plan ఆన్ అవుతుంది!
+
+# 1. Page Configuration
 st.set_page_config(
-    page_title="CreatorPulse by AIENGTEL - Free AI Growth Analyzer",
+    page_title="CreatorPulse AI by AIENGTEL - Global & Regional Growth Analyzer",
     page_icon="🚀",
-    layout="wide",
+    layout="wide"
 )
 
+# 2. Gemini API Auto-Rotation Function
+def generate_with_rotation(prompt):
+    api_keys = [
+        st.secrets.get("GEMINI_API_KEY"),
+        st.secrets.get("GEMINI_API_KEY_2")
+    ]
+    api_keys = [k for k in api_keys if k]
+    
+    for key in api_keys:
+        try:
+            genai.configure(api_key=key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            continue # మొదటి కీ లిమిట్ అయిపోతే రెండో కీకి మారుతుంది
+    return "Error: Server is busy due to high traffic. Please try again in a minute."
+
+# 3. PDF Generation Function
+def create_pdf(report_text, platform, username):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt=f"CreatorPulse AI - Growth Report ({platform})", ln=True, align='C')
+    pdf.cell(200, 10, txt=f"Account: {username} | Powered by AIENGTEL.com", ln=True, align='C')
+    pdf.ln(10)
+    clean_text = report_text.encode('latin-1', 'replace').decode('latin-1')
+    pdf.multi_cell(0, 8, txt=clean_text)
+    return pdf.output(dest="S").encode("latin-1")
+
+# 4. Sidebar - Global & Regional Settings + AIENGTEL Branding
 with st.sidebar:
-  st.header("🚀 CreatorPulse AI")
-  st.caption("Powered by **AIENGTEL.com**")
-  st.divider()
-  st.success("🎉 **Limited Time Free Launch!**")
-  st.write(
-      "✅ YouTube, Instagram & TikTok ఆటోమేటిక్ విశ్లేషణ\n✅ Global & Regional"
-      " గ్రోత్ స్ట్రాటజీ\n✅ ఉచిత PDF డౌన్‌లోడ్"
-  )
-  st.divider()
-  st.markdown("🌐 [Explore AI Tools on AIENGTEL](https://aiengtel.com)")
-
-st.title("🚀 CreatorPulse by AIENGTEL")
-st.subheader("YouTube, Instagram & TikTok (A to Z Growth Analyzer)")
-st.write(
-    "ఏదైనా వీడియో లింక్ ఇవ్వండి—గ్లోబల్ & రీజనల్ స్థాయిలో ప్రేక్షకుల నాడి,"
-    " వైరల్ ఐడియాలు, మరియు ఆదాయ మార్గాలను AI విశ్లేషిస్తుంది!"
-)
-
-GEMINI_KEYS = [
-    st.secrets["GEMINI_API_KEY"],
-    st.secrets["GEMINI_API_KEY_2"],
-]
-YOUTUBE_KEY = st.secrets["YOUTUBE_API_KEY"]
-RAPIDAPI_KEY = st.secrets["RAPIDAPI_API_KEY"]
-
-output_lang = st.selectbox(
-    "రిపోర్ట్ ఏ భాషలో కావాలి?", ["Telugu (తెలుగు)", "Tenglish", "English"]
-)
-
-
-def extract_youtube_id(url):
-  pattern = r"(?:v=|\/|live\/|shorts\/)([0-9A-Za-z_-]{11}).*"
-  match = re.search(pattern, url)
-  return match.group(1) if match else None
-
-
-def get_youtube_data(video_id):
-  youtube = build("youtube", "v3", developerKey=YOUTUBE_KEY)
-  vid_response = (
-      youtube.videos().list(part="snippet,statistics", id=video_id).execute()
-  )
-  if not vid_response["items"]:
-    return None
-  snippet = vid_response["items"][0]["snippet"]
-  stats = vid_response["items"][0]["statistics"]
-
-  comments = []
-  try:
-    com_response = (
-        youtube.commentThreads()
-        .list(
-            part="snippet",
-            videoId=video_id,
-            maxResults=50,
-            order="relevance",
-            textFormat="plainText",
-        )
-        .execute()
+    st.title("🌍 Global & Regional Settings")
+    
+    # భాష ఎంపిక (AIENGTEL మాదిరిగానే English & Telugu ముఖ్యంగా, ఇతర భాషలతో పాటు)
+    selected_lang = st.selectbox(
+        "Report Language / భాషను ఎంచుకోండి:",
+        [
+            "English (Global)", 
+            "Telugu (తెలుగు)", 
+            "Hindi (हिंदी)", 
+            "Tamil (தமிழ்)", 
+            "Kannada (ಕನ್ನಡ)",
+            "Malayalam (മലയാളം)",
+            "Spanish (Español)"
+        ]
     )
-    for item in com_response["items"]:
-      comments.append(
-          item["snippet"]["topLevelComment"]["snippet"]["textDisplay"]
-      )
-  except Exception:
-    comments.append("కామెంట్లు ఆఫ్ చేసి ఉన్నాయి.")
-
-  return {
-      "title": snippet["title"],
-      "description": snippet["description"][:1000],
-      "tags": snippet.get("tags", []),
-      "views": stats.get("viewCount", "0"),
-      "likes": stats.get("likeCount", "0"),
-      "comment_count": stats.get("commentCount", "0"),
-      "comments": comments,
-  }
-
-
-def extract_insta_code(url):
-  pattern = r"(?:reel|p|tv)\/([A-Za-z0-9_-]+)"
-  match = re.search(pattern, url)
-  return match.group(1) if match else None
-
-
-def get_insta_data(media_code):
-  url = "https://rapidapi.com"
-  headers = {
-      "x-rapidapi-key": RAPIDAPI_KEY,
-      "x-rapidapi-host": "://rapidapi.com",
-  }
-  res = requests.get(
-      url, headers=headers, params={"media_code": media_code}, timeout=20
-  )
-  if res.status_code == 200:
-    return str(res.json())[:4500]
-  return None
-
-
-def extract_tiktok_id(url):
-  if "://tiktok.com" in url or "://tiktok.com" in url:
-    try:
-      r = requests.head(url, allow_redirects=True, timeout=10)
-      url = r.url
-    except Exception:
-      pass
-  pattern = r"\/video\/(\d+)"
-  match = re.search(pattern, url)
-  return match.group(1) if match else None
-
-
-def get_tiktok_data(video_id):
-  url = f"https://rapidapi.com{video_id}"
-  headers = {
-      "x-rapidapi-key": RAPIDAPI_KEY,
-      "x-rapidapi-host": (
-          "://rapidapi.com"
-      ),
-  }
-  res = requests.get(url, headers=headers, timeout=20)
-  if res.status_code == 200:
-    return str(res.json())[:4500]
-  return None
-
-
-def generate_ai_report(platform, data_text, lang):
-  prompt = f"""
-    నువ్వు ఒక వరల్డ్-క్లాస్ {platform} గ్రోత్ మరియు వైరల్ కంటెంట్ స్ట్రాటజిస్ట్‌వి.
-    క్రింది వీడియో డేటాను (భాష, దేశం, ప్రాంతం, ప్రేక్షకుల స్పందన) లోతుగా విశ్లేషించి, {lang} భాషలో A to Z గ్రోత్ రిపోర్ట్ తయారు చెయ్యి.
-    ఈ కంటెంట్ ఏ రీజియన్ (Regional - ఉదా: తెలుగు/ఇండియా/లోకల్) లేదా గ్లోబల్ (Global) ఆడియన్స్ కోసం ఉందో గుర్తించి, దానికి తగ్గట్టుగా స్ట్రాటజీ ఇవ్వు.
     
-    డేటా: {data_text}
+    audience_type = st.radio(
+        "Target Audience / ఆడియన్స్ రకం:",
+        ["Regional / Local Audience", "Global / International Audience", "Both (Global + Regional)"]
+    )
     
-    ఈ 5 విభాగాలలో స్పష్టమైన సమాధానం ఇవ్వు:
-    1. 🌍 రీజనల్ & గ్లోబల్ ఆడియన్స్ నాడి (Audience Sentiment, Language/Region Reach & Top Questions)
-    2. 🪝 వైరల్ హుక్ & తర్వాతి 3 వీడియో ఐడియాలు (టైటిల్ / థంబ్‌నెయిల్ / స్క్రిప్ట్ ఐడియాతో)
-    3. 💰 ఆదాయ మార్గం (Local & Global Monetization / Brand Deals / Affiliate Idea)
-    4. 🔍 SEO, క్యాప్షన్ & హ్యాష్‌ట్యాగ్ మెరుగుదలలు (Regional + Global Tags)
-    5. 🚀 ఎంగేజ్‌మెంట్ పెంచే ప్రో-టిప్
-    """
-  last_error = ""
-  models_list = [
-      "gemini-3.5-flash-lite",
-      "gemini-3.5-flash",
-      "gemini-3-flash-preview",
-  ]
-  for key in GEMINI_KEYS:
-    client = genai.Client(api_key=key)
-    for model_name in models_list:
-      try:
-        response = client.models.generate_content(
-            model=model_name, contents=prompt
-        )
-        return response.text
-      except Exception as e:
-        last_error = str(e)
-        continue
-  return f"⚠️ అన్ని API కీల పరిమితి పూర్తయింది: {last_error}"
-
-
-def create_pdf(report_text):
-  pdf = FPDF()
-  pdf.add_page()
-  pdf.set_font("Arial", size=11)
-  clean_text = report_text.encode("latin-1", "replace").decode("latin-1")
-  pdf.multi_cell(0, 8, txt=clean_text)
-  return bytes(pdf.output())
-
-
-def display_full_report(report_text):
-  st.markdown(report_text)
-  st.download_button(
-      label="📥 Download Full Report (PDF)",
-      data=create_pdf(report_text),
-      file_name="CreatorPulse_Growth_Report.pdf",
-      mime="application/pdf",
-  )
-
-
-tab1, tab2, tab3 = st.tabs(["🎬 YouTube", "📱 Instagram Reels", "🎵 TikTok"])
-
-with tab1:
-  yt_url = st.text_input(
-      "🔗 YouTube వీడియో లేదా Shorts లింక్:", placeholder="https://youtu.be..."
-  )
-  if st.button("🚀 YouTube విశ్లేషణ ప్రారంభించు"):
-    vid_id = extract_youtube_id(yt_url) if yt_url else None
-    if not vid_id:
-      st.error("దయచేసి సరైన YouTube వీడియో లేదా Shorts లింక్ ఇవ్వండి.")
+    st.divider()
+    
+    # Free Launch Offer vs Paid Pro Plan Logic
+    if FREE_LAUNCH_MODE:
+        st.success("🎉 **FREE LAUNCH OFFER!**\nAll Pro features & PDF downloads are 100% FREE for a limited time!")
+        is_pro = True
     else:
-      with st.spinner("YouTube డేటా సేకరిస్తోంది..."):
-        info = get_youtube_data(vid_id)
-      if info:
-        c1, c2, c3 = st.columns(3)
-        c1.metric("👀 Views", info["views"])
-        c2.metric("👍 Likes", info["likes"])
-        c3.metric("💬 Comments", info["comment_count"])
-        with st.spinner("Global & Regional AI రిపోర్ట్ తయారు చేస్తోంది..."):
-          raw_data = (
-              f"Title: {info['title']}\nDesc:"
-              f" {info['description']}\nTags: {info['tags']}\nComments:"
-              f" {info['comments']}"
-          )
-          display_full_report(
-              generate_ai_report("YouTube", raw_data, output_lang)
-          )
-      else:
-        st.error("ఈ వీడియో వివరాలు లభించలేదు. పబ్లిక్ వీడియో లింక్ ఇవ్వండి.")
+        region = st.radio("Select Currency:", ["India (₹ INR)", "International ($ USD)"])
+        if region == "India (₹ INR)":
+            st.info("💎 **Pro Plan: ₹199 / month**\n- Unlimited Audits & PDF Reports")
+            st.markdown("[👉 Pay ₹199 via UPI / Razorpay](https://your-razorpay-link.com)")
+        else:
+            st.info("💎 **Pro Plan: $5 / month**\n- Unlimited Audits & PDF Reports")
+            st.markdown("[👉 Pay $5 via International Card](https://your-international-link.com)")
+        
+        pro_code = st.text_input("Enter Pro Access Code:", type="password")
+        is_pro = True if pro_code == "CREATORPRO2026" else False
 
-with tab2:
-  insta_url = st.text_input(
-      "🔗 Instagram Reel లేదా Post లింక్:",
-      placeholder="https://instagram.com...",
-  )
-  if st.button("🔥 Instagram విశ్లేషణ ప్రారంభించు"):
-    media_code = extract_insta_code(insta_url) if insta_url else None
-    if not media_code:
-      st.error("దయచేసి సరైన Instagram Reel లేదా Post లింక్ ఇవ్వండి.")
-    else:
-      with st.spinner("Instagram డేటా సేకరిస్తోంది..."):
-        insta_data = get_insta_data(media_code)
-      if insta_data:
-        with st.spinner("Global & Regional AI రిపోర్ట్ తయారు చేస్తోంది..."):
-          display_full_report(
-              generate_ai_report("Instagram Reels", insta_data, output_lang)
-          )
-      else:
-        st.error(
-            "Instagram డేటా పొందడంలో సమస్య వచ్చింది (ప్రైవేట్ అకౌంట్ లేదా API"
-            " పరిమితి అయి ఉండవచ్చు)."
-        )
+    st.divider()
+    st.markdown("### 🔗 Explore More AI Tools")
+    st.markdown("Discover 100+ Best AI Tools in **English & తెలుగు** at **[AIENGTEL.com](https://aiengtel.com)** 🚀")
 
-with tab3:
-  tiktok_url = st.text_input(
-      "🔗 TikTok వీడియో లింక్:",
-      placeholder="https://tiktok.com...",
-  )
-  if st.button("🎵 TikTok విశ్లేషణ ప్రారంభించు"):
-    tt_id = extract_tiktok_id(tiktok_url) if tiktok_url else None
-    if not tt_id:
-      st.error("దయచేసి సరైన TikTok వీడియో లింక్ ఇవ్వండి.")
+# 5. Main App Interface
+st.title("🚀 CreatorPulse AI")
+st.markdown("##### A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powered by **[AIENGTEL.com](https://aiengtel.com)**")
+
+if FREE_LAUNCH_MODE:
+    st.info("🎁 **Special Launch Access:** Enjoy unlimited AI Growth Audits & Free PDF Downloads for the next few days!")
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    platform = st.selectbox("Select Platform:", ["YouTube", "Instagram", "TikTok"])
+with col2:
+    handle = st.text_input("Channel / Profile Username:", placeholder="@username or link")
+with col3:
+    niche = st.text_input("Content Niche / Category:", placeholder="e.g., Tech, Vlogs, Cooking, Gaming")
+
+if st.button("Generate Free Growth Report 🔍", type="primary"):
+    if not handle:
+        st.warning("Please enter a valid username or channel link!")
     else:
-      with st.spinner("TikTok డేటా సేకరిస్తోంది..."):
-        tt_data = get_tiktok_data(tt_id)
-      if tt_data:
-        with st.spinner("Global & Regional AI రిపోర్ట్ తయారు చేస్తోంది..."):
-          display_full_report(
-              generate_ai_report("TikTok", tt_data, output_lang)
-          )
-      else:
-        st.error(
-            "TikTok డేటా పొందడంలో సమస్య వచ్చింది (లింక్ చెక్ చేయండి లేదా API"
-            " పరిమితి పూర్తయి ఉండవచ్చు)."
-        )
+        with st.spinner(f"Analyzing {handle} for {audience_type} in {selected_lang}..."):
+            prompt = f"""
+            Act as an expert Global & Regional Social Media Growth Strategist. Analyze this creator profile:
+            Platform: {platform}
+            Profile: {handle}
+            Niche: {niche}
+            Target Audience Scope: {audience_type}
+            Output Language: {selected_lang}
+
+            Provide a comprehensive, actionable A-to-Z growth report strictly in {selected_lang}.
+            Structure the report with these sections:
+            1. **Profile & Bio Optimization** (Tailored for {audience_type}).
+            2. **3 Viral Content & Hook Ideas** (Culturally relevant to the target audience).
+            3. **SEO, Keywords & Hashtag Strategy** (Mix of local/regional and global trending tags).
+            4. **Best Posting Times & Consistency Plan**.
+            5. **Monetization & Brand Deal Roadmap**.
+            
+            Make it practical, encouraging, and easy to read with bullet points.
+            """
+            
+            report = generate_with_rotation(prompt)
+            
+            st.success("✅ Your Custom Growth Report is Ready!")
+            st.markdown(report)
+            
+            if is_pro:
+                pdf_bytes = create_pdf(report, platform, handle)
+                st.download_button(
+                    label="📥 Download Full Report as PDF (Free Launch Gift)",
+                    data=pdf_bytes,
+                    file_name=f"{handle}_CreatorPulse_Report.pdf",
+                    mime="application/pdf"
+                )
