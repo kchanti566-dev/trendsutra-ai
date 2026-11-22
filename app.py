@@ -44,8 +44,8 @@ YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY", "")
 RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "")
 
 GOOGLE_SHEET_API = "https://google.com"
-PAY_1_MONTH_LINK = "https://rzp.io"
-PAY_12_MONTHS_LINK = "https://rzp.io"
+PAY_1_MONTH_LINK = "https://rzp.io/rzp/yop8jYS"
+PAY_12_MONTHS_LINK = "https://rzp.io/rzp/sjonGmqw"
 
 # --- బ్రౌజర్ కుకీ ద్వారా Refresh చేసినా మారని 3 Free Reports ట్రాకింగ్ ---
 cookie_free_used = get_cookie("ts_free_used_v3")
