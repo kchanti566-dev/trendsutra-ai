@@ -22,7 +22,7 @@ st.markdown(
     footer {visibility: hidden !important;}
     .stDeployButton {display: none !important;}
     div[data-testid="stToolbarActions"] {display: none !important;}
-    header[data-testid="stHeader"] {height: 1.5rem !important; background: transparent !important;}
+    header[data-testid="stHeader"] {height: 0.5rem !important; background: transparent !important;}
     .block-container {padding-top: 0rem !important; margin-top: -2.2rem !important; padding-bottom: 1rem !important;}
     section[data-testid="stSidebar"] > div:first-child {padding-top: 0.5rem !important; margin-top: -1.5rem !important;}
     div[data-testid="stSidebarUserContent"] {padding-top: 0rem !important;}
