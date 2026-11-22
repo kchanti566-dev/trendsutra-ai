@@ -14,18 +14,15 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --- పైన ఉన్న Share, Pencil, 3 Dots & క్రింద Manage App పూర్తిగా దాచే CSS ---
+# --- పైన Share, Fork, 3 Dots మాత్రమే దాచి, సైడ్‌బార్ ఎల్లప్పుడూ తెరిచి ఉంచే CSS ---
 st.markdown(
     """
     <style>
     #MainMenu {visibility: hidden !important;}
-    header[data-testid="stHeader"] {background: transparent !important;}
-    button[data-testid="stExpandSidebarButton"] {visibility: visible !important; color: white !important;}
     footer {visibility: hidden !important;}
     .stDeployButton {display: none !important;}
-    div[data-testid="stToolbar"] {display: none !important;}
-    div[data-testid="stDecoration"] {display: none !important;}
-    div[data-testid="stStatusWidget"] {display: none !important;}
+    div[data-testid="stToolbarActions"] {display: none !important;}
+    section[data-testid="stSidebar"] {min-width: 310px !important; max-width: 340px !important; transform: none !important;}
     div.stButton > button:first-child {background-color: #c92a2a; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
     div.stDownloadButton > button:first-child {background-color: #2b8a3e; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
     </style>
@@ -45,12 +42,21 @@ GOOGLE_SHEET_API = "https://google.com"
 PAY_1_MONTH_LINK = "https://rzp.io"
 PAY_12_MONTHS_LINK = "https://rzp.io"
 
-# --- బ్రౌజర్ కుకీ ద్వారా Refresh చేసినా మారని ట్రాకింగ్ ---
-cookie_free_used = get_cookie("ts_free_used")
+# --- బ్రౌజర్ కుకీ ద్వారా Refresh చేసినా మారని 3 Free Reports ట్రాకింగ్ ---
+cookie_free_used = get_cookie("ts_free_used_v3")
 cookie_pro = get_cookie("ts_pro_active")
 
 if "free_used_count" not in st.session_state:
-  st.session_state.free_used_count = 1 if cookie_free_used == "yes" else 0
+  st.session_state.free_used_count = (
+      int(cookie_free_used)
+      if (cookie_free_used and str(cookie_free_used).isdigit())
+      else 0
+  )
+elif cookie_free_used and str(cookie_free_used).isdigit():
+  st.session_state.free_used_count = max(
+      st.session_state.free_used_count, int(cookie_free_used)
+  )
+
 if "is_pro_user" not in st.session_state:
   st.session_state.is_pro_user = True if cookie_pro == "yes" else False
 elif cookie_pro == "yes":
@@ -101,7 +107,7 @@ with st.sidebar:
     st.success("✅ **PRO UNLIMITED ACTIVE!**\n\nమీరు అన్‌లిమిటెడ్ రిపోర్ట్‌లు పొందవచ్చు.")
   else:
     remaining = max(0, 3 - st.session_state.free_used_count)
-    st.info(f"🎁 **Free Trial:** మీకు **{remaining} ఉచిత రిపోర్ట్** మిగిలి ఉంది.")
+    st.info(f"🎁 **Free Trial:** మీకు **{remaining} ఉచిత రిపోర్ట్‌లు** మిగిలి ఉన్నాయి.")
     st.markdown(
         f"* **1 Month Unlimited:** **₹100/-** 👉 [Pay ₹100 Now]({PAY_1_MONTH_LINK})\n"
         f"* **12 Months Unlimited:** **₹1,000/-** 👉 [Pay ₹1,000"
@@ -274,7 +280,7 @@ if "report_platform" not in st.session_state:
 if st.button("Generate Accurate Growth Report 🔍"):
   if not st.session_state.is_pro_user and st.session_state.free_used_count >= 3:
     st.session_state.generated_report = ""
-    st.error("🔒 **మీ 1 ఉచిత రిపోర్ట్ పూర్తయింది!**")
+    st.error("🔒 **మీ 3 ఉచిత రిపోర్ట్‌లు పూర్తయ్యాయి!**")
     st.markdown(
         "### 🚀 Unlimited Growth Reports పొందడానికి Pro Plan ఎంచుకోండి:\n"
         f"* **1 Month Unlimited Plan — ₹100/-** 👉 [Click Here to Pay"
@@ -322,7 +328,9 @@ if st.button("Generate Accurate Growth Report 🔍"):
           st.session_state.report_platform = platform
           if not st.session_state.is_pro_user:
             st.session_state.free_used_count += 1
-            set_cookie("ts_free_used", str(st.session_state.free_used_count), 365)
+            set_cookie(
+                "ts_free_used_v3", str(st.session_state.free_used_count), 365
+            )
             st.rerun()
         else:
           st.session_state.generated_report = ""
