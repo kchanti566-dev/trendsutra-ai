@@ -46,25 +46,26 @@ PAY_1_MONTH_LINK = "https://rzp.io/rzp/yop8jYS"
 PAY_12_MONTHS_LINK = "https://rzp.io/rzp/sjonGmqw"
 
 ls_free = streamlit_js_eval(
-    js_expressions="localStorage.getItem('ts_free_v4')", key="ls_get_free"
-)
-ls_pro = streamlit_js_eval(
-    js_expressions="localStorage.getItem('ts_pro_v4')", key="ls_get_pro"
-)
+       js_expressions="localStorage.getItem('ts_free_v4')", key="ls_get_free"
+   )
+   ls_pro = streamlit_js_eval(
+       js_expressions="localStorage.getItem('ts_pro_v4')", key="ls_get_pro"
+   )
 
-if "free_used_count" not in st.session_state:
-  st.session_state.free_used_count = (
-      int(ls_free) if (ls_free and str(ls_free).isdigit()) else 0
-  )
-elif ls_free and str(ls_free).isdigit():
-  st.session_state.free_used_count = max(
-      st.session_state.free_used_count, int(ls_free)
-  )
+   if "free_used_count" not in st.session_state:
+     st.session_state.free_used_count = 0
+   if "is_pro_user" not in st.session_state:
+     st.session_state.is_pro_user = False
 
-if "is_pro_user" not in st.session_state:
-  st.session_state.is_pro_user = ls_pro == "yes"
-elif ls_pro == "yes":
-  st.session_state.is_pro_user = True
+   if ls_free and str(ls_free).isdigit():
+     saved_count = int(ls_free)
+   if saved_count > st.session_state.free_used_count:
+       st.session_state.free_used_count = saved_count
+       st.rerun()
+
+   if ls_pro == "yes" and not st.session_state.is_pro_user:
+     st.session_state.is_pro_user = True
+     st.rerun()
 
 
 def verify_payment_id(pid):
