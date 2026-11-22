@@ -14,25 +14,20 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --- పైన Share, Fork, 3 Dots మాత్రమే దాచి, సైడ్‌బార్ ఎల్లప్పుడూ తెరిచి ఉంచే CSS ---
 st.markdown(
     """
     <style>
     #MainMenu {visibility: hidden !important;}
     footer {visibility: hidden !important;}
-    div[class*="viewerBadge"] {display: none !important;}
-    div[class*="profileContainer"], a[href*="streamlit.io/cloud"] {display: none !important;}
     .stDeployButton {display: none !important;}
     div[data-testid="stToolbarActions"] {display: none !important;}
-    header[data-testid="stHeader"] {height: 0.5rem !important; background: transparent !important;}
+    header[data-testid="stHeader"] {height: 1.5rem !important; background: transparent !important;}
     .block-container {padding-top: 0rem !important; margin-top: -2.2rem !important; padding-bottom: 1rem !important;}
-    section[data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important; margin-top: -0.5rem !important;}
+    section[data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important; margin-top: -1.5rem !important;}
     div[data-testid="stSidebarUserContent"] {padding-top: 0rem !important;}
     div.stButton > button:first-child {background-color: #c92a2a; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
     div.stDownloadButton > button:first-child {background-color: #2b8a3e; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
     </style>
-
-
     """,
     unsafe_allow_html=True,
 )
@@ -45,11 +40,13 @@ GEMINI_KEYS = [k for k in raw_keys if k]
 YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY", "")
 RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "")
 
-GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbzEkkgxBP7aOKIXkEiOG7_rWc0quvnvTVqQDSWUAMk2zOPN7W8Ue_uOPwH7edmJJtEd/exec"
-PAY_1_MONTH_LINK = "https://rzp.io/rzp/yop8jYS"
-PAY_12_MONTHS_LINK = "https://rzp.io/rzp/sjonGmqw"
+# --- మీ Google Sheet Apps Script Web App URL ---
+GOOGLE_SHEET_API = "https://google.com"
 
-# --- బ్రౌజర్ కుకీ ద్వారా Refresh చేసినా మారని 3 Free Reports ట్రాకింగ్ ---
+# --- మీ రెండు పూర్తి Razorpay పేమెంట్ లింక్‌లను ఇక్కడ పేస్ట్ చేయండి ---
+PAY_1_MONTH_LINK = "https://rzp.io"
+PAY_12_MONTHS_LINK = "https://rzp.io"
+
 cookie_free_used = get_cookie("ts_free_used_v3")
 cookie_pro = get_cookie("ts_pro_active")
 
@@ -68,33 +65,33 @@ if "is_pro_user" not in st.session_state:
   st.session_state.is_pro_user = True if cookie_pro == "yes" else False
 elif cookie_pro == "yes":
   st.session_state.is_pro_user = True
+
+
 def verify_payment_id(pid):
-  owner_key = st.secrets.get("OWNER_SECRET_CODE", "")
-  if owner_key and pid and pid.strip() == owner_key:
-    return "VALID"
-  if not pid or not pid.strip().startswith("pay_"):
+  if not pid:
     return "INVALID"
-  ...
-   
-def verify_payment_id(pid):
-  if not pid or not pid.strip().startswith("pay_"):
+  clean_pid = pid.strip()
+  owner_key = str(st.secrets.get("OWNER_SECRET_CODE", "")).strip()
+  if owner_key and clean_pid == owner_key:
+    return "OWNER_VALID"
+  if not clean_pid.startswith("pay_"):
     return "INVALID"
   try:
-    full_url = f"{GOOGLE_SHEET_API}?pid={pid.strip()}"
+    full_url = f"{GOOGLE_SHEET_API}?pid={clean_pid}"
     headers = {"User-Agent": "Mozilla/5.0"}
     res = requests.get(
         full_url, headers=headers, allow_redirects=True, timeout=15
     )
     txt = res.text.strip()
-    if txt == "ALREADY_USED" or "ALREADY_USED" in txt:
+    if "ALREADY_USED" in txt:
       return "ALREADY_USED"
-    if txt == "INVALID" or "INVALID" in txt:
+    if "INVALID" in txt:
       return "INVALID"
-    if txt == "VALID" or "VALID" in txt:
+    if "VALID" in txt:
       return "VALID"
-    return f"DEBUG:{txt[:60]}"
-  except Exception as e:
-    return f"ERROR:{str(e)}"
+    return "INVALID"
+  except Exception:
+    return "ERROR"
 
 
 url_pid = st.query_params.get("razorpay_payment_id", "")
@@ -136,16 +133,17 @@ with st.sidebar:
     )
     if st.button("Unlock with Payment ID 🔓"):
       res_status = verify_payment_id(manual_pid)
-      if res_status == "VALID":
-       st.session_state.is_pro_user = True
-       if manual_pid.strip() != st.secrets.get("OWNER_SECRET_CODE", ""):
-         set_cookie("ts_pro_active", "yes", 30)
-       st.rerun()
+      if res_status == "OWNER_VALID":
+        st.session_state.is_pro_user = True
+        st.rerun()
+      elif res_status == "VALID":
+        st.session_state.is_pro_user = True
+        set_cookie("ts_pro_active", "yes", 30)
+        st.rerun()
       elif res_status == "ALREADY_USED":
-        st.error("❌ ఈ Payment ID ఇప్పటికే వాడారు!")
+        st.error("❌ ఈ Payment ID ఇప్పటికే వేరే వారు వాడారు!")
       else:
         st.error("❌ సరైన Payment ID ఇవ్వండి.")
-
 if os.path.isfile("logo.png"):
   col_logo, col_title = st.columns((1, 5))
   with col_logo:
