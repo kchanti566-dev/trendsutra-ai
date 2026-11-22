@@ -66,18 +66,23 @@ if "is_pro_user" not in st.session_state:
   st.session_state.is_pro_user = True if cookie_pro == "yes" else False
 elif cookie_pro == "yes":
   st.session_state.is_pro_user = True
-
 def verify_payment_id(pid):
   if not pid or not pid.strip().startswith("pay_"):
     return "INVALID"
   try:
     full_url = f"{GOOGLE_SHEET_API}?pid={pid.strip()}"
-    res = requests.get(full_url, allow_redirects=True, timeout=15)
-    return res.text.strip()
-  except Exception as e:
-    return f"ERROR: {str(e)}"
-
-
+    headers = {"User-Agent": "Mozilla/5.0"}
+    res = requests.get(
+        full_url, headers=headers, allow_redirects=True, timeout=15
+    )
+    txt = res.text.strip()
+    if "ALREADY_USED" in txt:
+      return "ALREADY_USED"
+    if "VALID" in txt:
+      return "VALID"
+    return "INVALID"
+  except Exception:
+    return "ERROR"
 
 url_pid = st.query_params.get("razorpay_payment_id", "")
 if url_pid and not st.session_state.is_pro_user:
