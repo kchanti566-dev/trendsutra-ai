@@ -5,7 +5,7 @@ from google import genai
 from googleapiclient.discovery import build
 import requests
 import streamlit as st
-from streamlit_js_eval import get_cookie, set_cookie
+from streamlit_js_eval import streamlit_js_eval
 
 st.set_page_config(
     page_title="TrendSutra AI - Growth Analyzer",
@@ -40,33 +40,31 @@ GEMINI_KEYS = [k for k in raw_keys if k]
 YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY", "")
 RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "")
 
-# --- మీ Google Sheet Apps Script Web App URL ---
-GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbzEkkgxBP7aOKIXkEiOG7_rWc0quvnvTVqQDSWUAMk2zOPN7W8Ue_uOPwH7edmJJtEd/exec"
-
-# --- మీ రెండు పూర్తి Razorpay పేమెంట్ లింక్‌లను ఇక్కడ పేస్ట్ చేయండి ---
-# --- మీ రెండు పూర్తి Razorpay లింక్‌లను ఇక్కడ పేస్ట్ చేయండి ---
+GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbzEkkgxBP7aOKIXkEiOG7_rWc0quvnvTVqQDSWUAMk2zOPN7W8Ue_uOPwH7edmJJtEd/exec
+"
 PAY_1_MONTH_LINK = "https://rzp.io/rzp/yop8jYS"
 PAY_12_MONTHS_LINK = "https://rzp.io/rzp/sjonGmqw"
 
-# --- పేజీ Refresh చేసిన క్షణంలోనే కుకీ చదివే శాశ్వత విధానం ---
-raw_cookies = st.context.cookies
-cookie_free_used = raw_cookies.get("ts_free_used_v3", "0")
-cookie_pro = raw_cookies.get("ts_pro_active", "no")
+ls_free = streamlit_js_eval(
+    js_expressions="localStorage.getItem('ts_free_v4')", key="ls_get_free"
+)
+ls_pro = streamlit_js_eval(
+    js_expressions="localStorage.getItem('ts_pro_v4')", key="ls_get_pro"
+)
 
 if "free_used_count" not in st.session_state:
   st.session_state.free_used_count = (
-      int(cookie_free_used) if str(cookie_free_used).isdigit() else 0
+      int(ls_free) if (ls_free and str(ls_free).isdigit()) else 0
   )
-elif str(cookie_free_used).isdigit():
+elif ls_free and str(ls_free).isdigit():
   st.session_state.free_used_count = max(
-      st.session_state.free_used_count, int(cookie_free_used)
+      st.session_state.free_used_count, int(ls_free)
   )
 
 if "is_pro_user" not in st.session_state:
-  st.session_state.is_pro_user = cookie_pro == "yes"
-elif cookie_pro == "yes":
+  st.session_state.is_pro_user = ls_pro == "yes"
+elif ls_pro == "yes":
   st.session_state.is_pro_user = True
-
 
 
 def verify_payment_id(pid):
@@ -101,7 +99,10 @@ if url_pid and not st.session_state.is_pro_user:
   status = verify_payment_id(url_pid)
   if status == "VALID":
     st.session_state.is_pro_user = True
-    set_cookie("ts_pro_active", "yes", 30)
+    streamlit_js_eval(
+        js_expressions="localStorage.setItem('ts_pro_v4', 'yes')",
+        key="ls_set_pro_url",
+    )
     st.toast("🎉 Payment Verified! Unlimited Pro Access Unlocked!")
   elif status == "ALREADY_USED":
     st.sidebar.error("⚠️ ఈ Payment ID ఇప్పటికే వాడబడింది!")
@@ -140,7 +141,11 @@ with st.sidebar:
         st.rerun()
       elif res_status == "VALID":
         st.session_state.is_pro_user = True
-        set_cookie("ts_pro_active", "yes", 30)
+        streamlit_js_eval(
+            js_expressions="localStorage.setItem('ts_pro_v4', 'yes')",
+            key=f"ls_set_pro_{int(time.time())}",
+        )
+        time.sleep(0.5)
         st.rerun()
       elif res_status == "ALREADY_USED":
         st.error("❌ ఈ Payment ID ఇప్పటికే వేరే వారు వాడారు!")
@@ -348,10 +353,14 @@ if st.button("Generate Accurate Growth Report 🔍"):
           st.session_state.report_platform = platform
           if not st.session_state.is_pro_user:
             st.session_state.free_used_count += 1
-            set_cookie(
-                "ts_free_used_v3", str(st.session_state.free_used_count), 365
+            streamlit_js_eval(
+                js_expressions=(
+                    f"localStorage.setItem('ts_free_v4',"
+                    f" '{st.session_state.free_used_count}')"
+                ),
+                key=f"ls_set_free_{int(time.time())}",
             )
-            time.sleep(0.6)
+            time.sleep(0.5)
             st.rerun()
         else:
           st.session_state.generated_report = ""
