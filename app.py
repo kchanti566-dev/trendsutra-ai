@@ -307,6 +307,7 @@ if st.button("Generate Accurate Growth Report 🔍"):
           st.session_state.report_platform = platform
           if not st.session_state.is_pro_user:
             st.session_state.free_used_count += 1
+              st.rerun()
         else:
           st.session_state.generated_report = ""
           st.error(result_text)
