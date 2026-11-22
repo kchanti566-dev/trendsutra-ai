@@ -66,6 +66,7 @@ if "is_pro_user" not in st.session_state:
   st.session_state.is_pro_user = True if cookie_pro == "yes" else False
 elif cookie_pro == "yes":
   st.session_state.is_pro_user = True
+    
 def verify_payment_id(pid):
   if not pid or not pid.strip().startswith("pay_"):
     return "INVALID"
@@ -76,13 +77,16 @@ def verify_payment_id(pid):
         full_url, headers=headers, allow_redirects=True, timeout=15
     )
     txt = res.text.strip()
-    if "ALREADY_USED" in txt:
+    if txt == "ALREADY_USED" or "ALREADY_USED" in txt:
       return "ALREADY_USED"
-    if "VALID" in txt:
+    if txt == "INVALID" or "INVALID" in txt:
+      return "INVALID"
+    if txt == "VALID" or "VALID" in txt:
       return "VALID"
-    return "INVALID"
-  except Exception:
-    return "ERROR"
+    return f"DEBUG:{txt[:60]}"
+  except Exception as e:
+    return f"ERROR:{str(e)}"
+
 
 url_pid = st.query_params.get("razorpay_payment_id", "")
 if url_pid and not st.session_state.is_pro_user:
