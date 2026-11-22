@@ -5,11 +5,31 @@ from google import genai
 from googleapiclient.discovery import build
 import requests
 import streamlit as st
+from streamlit_js_eval import get_cookie, set_cookie
 
 st.set_page_config(
     page_title="TrendSutra AI - Growth Analyzer",
     page_icon="logo.png" if os.path.isfile("logo.png") else "🚀",
     layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# --- పైన ఉన్న Share, Pencil, 3 Dots & క్రింద Manage App పూర్తిగా దాచే CSS ---
+st.markdown(
+    """
+    <style>
+    #MainMenu {visibility: hidden !important;}
+    header {visibility: hidden !important;}
+    footer {visibility: hidden !important;}
+    .stDeployButton {display: none !important;}
+    div[data-testid="stToolbar"] {display: none !important;}
+    div[data-testid="stDecoration"] {display: none !important;}
+    div[data-testid="stStatusWidget"] {display: none !important;}
+    div.stButton > button:first-child {background-color: #c92a2a; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
+    div.stDownloadButton > button:first-child {background-color: #2b8a3e; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 raw_keys = (
@@ -20,19 +40,23 @@ GEMINI_KEYS = [k for k in raw_keys if k]
 YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY", "")
 RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "")
 
-# --- మీ Google Sheets వన్-టైమ్ వెరిఫికేషన్ లింక్ ---
-GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbyszYZ_JaSSn2swWYfy9VkcbKE_hAY5ClWTIJ_qVhk6mBBmEc-R1wVDg7-Edr8t6RiU/exec"
+GOOGLE_SHEET_API = "https://google.com"
+PAY_1_MONTH_LINK = "https://rzp.io"
+PAY_12_MONTHS_LINK = "https://rzp.io"
 
-# --- మీ రెండు పూర్తి Razorpay పేమెంట్ లింక్‌లను ఇక్కడ పేస్ట్ చేయండి ---
-PAY_1_MONTH_LINK = "https://rzp.io/rzp/yop8jYS"  # ఇక్కడ పూర్తి ₹100 లింక్ పేస్ట్ చేయండి
-PAY_12_MONTHS_LINK = (
-    "https://rzp.io/rzp/sjonGmqw"  # ఇక్కడ పూర్తి ₹1000 లింక్ పేస్ట్ చేయండి
-)
+# --- బ్రౌజర్ కుకీ ద్వారా Refresh చేసినా మారని ట్రాకింగ్ ---
+cookie_free_used = get_cookie("ts_free_used")
+cookie_pro = get_cookie("ts_pro_active")
 
 if "free_used_count" not in st.session_state:
-  st.session_state.free_used_count = 0
+  st.session_state.free_used_count = 1 if cookie_free_used == "yes" else 0
+elif cookie_free_used == "yes":
+  st.session_state.free_used_count = 1
+
 if "is_pro_user" not in st.session_state:
-  st.session_state.is_pro_user = False
+  st.session_state.is_pro_user = True if cookie_pro == "yes" else False
+elif cookie_pro == "yes":
+  st.session_state.is_pro_user = True
 
 
 def verify_payment_id(pid):
@@ -47,15 +71,15 @@ def verify_payment_id(pid):
     return "ERROR"
 
 
-# --- Razorpay నుండి పేమెంట్ అయి తిరిగి రాగానే ఆటోమేటిక్ అన్‌లాక్ ---
 url_pid = st.query_params.get("razorpay_payment_id", "")
 if url_pid and not st.session_state.is_pro_user:
   status = verify_payment_id(url_pid)
   if status == "VALID":
     st.session_state.is_pro_user = True
+    set_cookie("ts_pro_active", "yes", 30)
     st.toast("🎉 Payment Verified! Unlimited Pro Access Unlocked!")
   elif status == "ALREADY_USED":
-    st.sidebar.error("⚠️ ఈ Payment ID ఇప్పటికే వాడబడింది (Already Used)!")
+    st.sidebar.error("⚠️ ఈ Payment ID ఇప్పటికే వాడబడింది!")
 
 with st.sidebar:
   st.markdown("## 🌍 Global & Regional Settings")
@@ -92,6 +116,7 @@ with st.sidebar:
       res_status = verify_payment_id(manual_pid)
       if res_status == "VALID":
         st.session_state.is_pro_user = True
+        set_cookie("ts_pro_active", "yes", 30)
         st.rerun()
       elif res_status == "ALREADY_USED":
         st.error("❌ ఈ Payment ID ఇప్పటికే వేరే వారు వాడారు!")
@@ -241,15 +266,6 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
   )
 
 
-st.markdown(
-    "<style>div.stButton > button:first-child {background-color: #c92a2a;"
-    " color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem"
-    " 1.2rem; border: none;} div.stDownloadButton > button:first-child"
-    " {background-color: #2b8a3e; color: white; font-weight: bold;"
-    " border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}</style>",
-    unsafe_allow_html=True,
-)
-
 if "generated_report" not in st.session_state:
   st.session_state.generated_report = ""
 if "report_stats" not in st.session_state:
@@ -259,8 +275,8 @@ if "report_platform" not in st.session_state:
 
 if st.button("Generate Accurate Growth Report 🔍"):
   if not st.session_state.is_pro_user and st.session_state.free_used_count >= 1:
-    st.error("🔒 **మీ 1 ఉచిత రిపోర్ట్ పూర్తయింది!**")
     st.session_state.generated_report = ""
+    st.error("🔒 **మీ 1 ఉచిత రిపోర్ట్ పూర్తయింది!**")
     st.markdown(
         "### 🚀 Unlimited Growth Reports పొందడానికి Pro Plan ఎంచుకోండి:\n"
         f"* **1 Month Unlimited Plan — ₹100/-** 👉 [Click Here to Pay"
@@ -306,9 +322,10 @@ if st.button("Generate Accurate Growth Report 🔍"):
               stats_obj if platform == "YouTube" else None
           )
           st.session_state.report_platform = platform
-        if not st.session_state.is_pro_user:
-          st.session_state.free_used_count += 1
-          st.rerun()
+          if not st.session_state.is_pro_user:
+            st.session_state.free_used_count = 1
+            set_cookie("ts_free_used", "yes", 365)
+            st.rerun()
         else:
           st.session_state.generated_report = ""
           st.error(result_text)
