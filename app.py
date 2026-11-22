@@ -137,9 +137,10 @@ with st.sidebar:
     if st.button("Unlock with Payment ID 🔓"):
       res_status = verify_payment_id(manual_pid)
       if res_status == "VALID":
-        st.session_state.is_pro_user = True
-        set_cookie("ts_pro_active", "yes", 30)
-        st.rerun()
+       st.session_state.is_pro_user = True
+       if manual_pid.strip() != st.secrets.get("OWNER_SECRET_CODE", ""):
+         set_cookie("ts_pro_active", "yes", 30)
+       st.rerun()
       elif res_status == "ALREADY_USED":
         st.error("❌ ఈ Payment ID ఇప్పటికే వాడారు!")
       else:
