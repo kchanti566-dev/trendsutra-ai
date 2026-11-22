@@ -12,37 +12,70 @@ st.set_page_config(
     layout="wide",
 )
 
-GEMINI_KEYS = [
+raw_keys = (
     st.secrets.get("GEMINI_API_KEY", ""),
     st.secrets.get("GEMINI_API_KEY_2", ""),
-]
-GEMINI_KEYS = [k for k in GEMINI_KEYS if k]
+)
+GEMINI_KEYS = [k for k in raw_keys if k]
 YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY", "")
 RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "")
 
+# --- VIP యాక్సెస్ కోడ్‌లు ---
+VALID_VIP_CODES = ("TS100VIP", "TS1000PRO", "ADMIN2026")
+
+# --- పేమెంట్ లింక్‌లు (మీ Razorpay లింక్‌లు తయారయ్యాక ఇక్కడ మార్చుకోండి) ---
+PAY_1_MONTH_LINK = "https://razorpay.com"
+PAY_12_MONTHS_LINK = "https://razorpay.com"
+
+if "free_used_count" not in st.session_state:
+  st.session_state.free_used_count = 0
+if "is_pro_user" not in st.session_state:
+  st.session_state.is_pro_user = False
+
+# --- ఎడమ వైపు సైడ్‌బార్ ---
 with st.sidebar:
   st.markdown("## 🌍 Global & Regional Settings")
   report_lang = st.selectbox(
       "Report Language / భాషను ఎంచుకోండి:",
-      ["English (Global)", "Telugu (తెలుగు)", "Tenglish"],
+      ("English (Global)", "Telugu (తెలుగు)", "Tenglish"),
   )
   target_audience = st.radio(
       "Target Audience / ఆడియన్స్ రకం:",
-      [
+      (
           "Regional / Local Audience",
           "Global / International Audience",
           "Both (Global + Regional)",
-      ],
-  )
-  st.markdown("---")
-  st.success(
-      "🎉 **FREE LAUNCH OFFER!**\n\nUnlimited Deep AI Audits are 100% FREE for"
-      " a limited time!"
+      ),
   )
 
-# --- సురక్షిత లోగో & టైటిల్ ---
+  st.markdown("---")
+  st.markdown("## 💎 Pro Plans (Unlimited)")
+
+  if st.session_state.is_pro_user:
+    st.success("✅ **PRO UNLIMITED ACTIVE!**\n\nమీరు అన్‌లిమిటెడ్ రిపోర్ట్‌లు పొందవచ్చు.")
+  else:
+    remaining = max(0, 1 - st.session_state.free_used_count)
+    st.info(f"🎁 **Free Trial:** మీకు **{remaining} ఉచిత రిపోర్ట్** మిగిలి ఉంది.")
+    st.markdown(
+        f"* **1 Month Unlimited:** **₹100/-** 👉 [Pay ₹100 Now]({PAY_1_MONTH_LINK})\n"
+        f"* **12 Months Unlimited:** **₹1,000/-** 👉 [Pay ₹1,000"
+        f" Now]({PAY_12_MONTHS_LINK})"
+    )
+    vip_input = st.text_input(
+        "🔑 పేమెంట్ చేశాక వచ్చిన Access Code ఎంటర్ చేయండి:",
+        type="password",
+        placeholder="ఉదా: TS100VIP",
+    )
+    if st.button("Unlock Unlimited Access 🔓"):
+      if vip_input.strip().upper() in VALID_VIP_CODES:
+        st.session_state.is_pro_user = True
+        st.rerun()
+      else:
+        st.error("❌ తప్పు కోడ్! దయచేసి సరైన కోడ్ ఇవ్వండి.")
+
+# --- లోగో & టైటిల్ ---
 if os.path.isfile("logo.png"):
-  col_logo, col_title = st.columns([1, 6])
+  col_logo, col_title = st.columns((1, 5))
   with col_logo:
     st.image("logo.png", width=100)
   with col_title:
@@ -58,15 +91,10 @@ else:
       " [AIENGTEL.com](https://aiengtel.com)**"
   )
 
-st.info(
-    "🎁 **Special Launch Access:** Enjoy unlimited real-data AI Growth Audits"
-    " for free!"
-)
-
-col1, col2 = st.columns([1, 2])
+col1, col2 = st.columns(2)
 with col1:
   platform = st.selectbox(
-      "Select Platform:", ["YouTube", "Instagram Reels", "TikTok"]
+      "Select Platform:", ("YouTube", "Instagram Reels", "TikTok")
   )
 with col2:
   video_url = st.text_input(
@@ -93,11 +121,11 @@ def fetch_youtube_info(url):
     vid_res = (
         youtube.videos().list(part="snippet,statistics", id=vid_id).execute()
     )
-    items_list = vid_res.get("items", [])
+    items_list = vid_res.get("items", ())
     if not items_list:
       return None, "ఈ వీడియో వివరాలు దొరకలేదు (ప్రైవేట్ వీడియో కావచ్చు)."
-    item = items_list[0]
-    snippet = item["snippet"]
+    item = next(iter(items_list))
+    snippet = item.get("snippet", {})
     stats = item.get("statistics", {})
     comments = []
     try:
@@ -112,27 +140,32 @@ def fetch_youtube_info(url):
           )
           .execute()
       )
-      for c in com_res.get("items", []):
+      for c in com_res.get("items", ()):
         comments.append(
-            c["snippet"]["topLevelComment"]["snippet"]["textDisplay"]
+            c.get("snippet", {})
+            .get("topLevelComment", {})
+            .get("snippet", {})
+            .get("textDisplay", "")
         )
     except Exception:
       comments.append("కామెంట్లు ఆఫ్ చేసి ఉన్నాయి.")
     summary = (
-        f"Title: {snippet.get('title')}\nViews:"
-        f" {stats.get('viewCount', '0')}, Likes:"
+        f"Title: {snippet.get('title')}\n"
+        f"Views: {stats.get('viewCount', '0')}, Likes:"
         f" {stats.get('likeCount', '0')}, Comments:"
-        f" {stats.get('commentCount', '0')}\nDescription:"
-        f" {snippet.get('description', '')[:800]}\nTags:"
-        f" {snippet.get('tags', [])}\nTop Comments: {comments}"
+        f" {stats.get('commentCount', '0')}\n"
+        f"Description: {snippet.get('description', '')[:800]}\n"
+        f"Tags: {snippet.get('tags', ())}\n"
+        f"Top Comments: {comments}"
     )
     return summary, stats
   except Exception as e:
     return None, f"YouTube API లోపం: {str(e)}"
 
 
-def fetch_rapidapi_safe(api_url, host, params, fallback_label):
+def fetch_rapidapi_safe(host, path, params, fallback_label):
   try:
+    api_url = "https://" + host + path
     headers = {"x-rapidapi-key": RAPIDAPI_KEY, "x-rapidapi-host": host}
     res = requests.get(api_url, headers=headers, params=params, timeout=15)
     if res.status_code == 200 and res.text and res.text.strip():
@@ -146,30 +179,27 @@ def fetch_rapidapi_safe(api_url, host, params, fallback_label):
 
 
 def generate_growth_report(platform_name, raw_data, lang, audience):
-  prompt = f"""
-    You are a friendly, practical {platform_name} Growth Advisor for TrendSutra AI.
-    Analyze the data and give an A-to-Z Growth Report.
-    
-    CRITICAL LANGUAGE & TONE RULES:
-    - Output Language: {lang}
-    - If {lang} is Telugu: Write in simple, natural, everyday spoken Telugu like a friend explaining to another friend (use common English words like Views, Comments, Title, Thumbnail, Hook, Reach, Subscribers naturally). STRICTLY AVOID bookish or formal Telugu words like "ప్రేక్షకుల నాడి", "విశ్లేషణ ప్రకారం", "వ్యూహాత్మక", etc.
-    - Target Audience: {audience}
-    - Start with 1 simple line mentioning "TrendSutra AI" (e.g., "TrendSutra AI ఇచ్చిన మీ ఛానెల్ గ్రోత్ రిపోర్ట్ ఇక్కడ ఉంది:"), then go straight to Section 1.
-    
-    Source Data: {raw_data}
-    
-    Structure into 5 clear sections:
-    1. 👥 **Viewers ఏమనుకుంటున్నారు? (Audience Feedback & Questions)**
-    2. 🎥 **తర్వాత చేయాల్సిన 3 Viral Video Ideas (Titles & Hooks తో)**
-    3. 💰 **ఈ ఛానెల్ ద్వారా డబ్బులు ఎలా సంపాదించాలి? (Earning Ideas)**
-    4. 🔍 **Views పెరగడానికి Title, Description & Tags మార్పులు**
-    5. 🚀 **రాబోయే 30 రోజుల్లో చేయాల్సిన 3 ముఖ్య పనులు**
-    """
-  models_list = [
+  prompt = (
+      f"You are a friendly, practical {platform_name} Growth Advisor for"
+      " TrendSutra AI.\nAnalyze the data and give an A-to-Z Growth"
+      f" Report.\n- Output Language: {lang}\n- If {lang} is Telugu: Write in"
+      " simple, natural, everyday spoken Telugu like a friend explaining to"
+      ' another friend. Use exact Telugu spelling "పని 1", "పని 2", "పని 3"'
+      ' (NEVER write "పను 1").\n- Target Audience:'
+      f" {audience}\n- Start with 1 simple line mentioning TrendSutra AI, then"
+      f" go straight to Section 1.\nSource Data: {raw_data}\nStructure into 5"
+      " clear sections:\n"
+      "1. 👥 **Viewers ఏమనుకుంటున్నారు? (Audience Feedback & Questions)**\n"
+      "2. 🎥 **తర్వాత చేయాల్సిన 3 Viral Video Ideas (Titles & Hooks తో)**\n"
+      "3. 💰 **ఈ ఛానెల్ ద్వారా డబ్బులు ఎలా సంపాదించాలి? (Earning Ideas)**\n"
+      "4. 🔍 **Views పెరగడానికి Title, Description & Tags మార్పులు**\n"
+      "5. 🚀 **రాబోయే 30 రోజుల్లో చేయాల్సిన 3 ముఖ్య పనులు (పని 1, పని 2, పని 3)**"
+  )
+  models_list = (
       "gemini-3.5-flash-lite",
       "gemini-3.8-flash",
       "gemini-2.5-flash",
-  ]
+  )
   for attempt in range(2):
     for key in GEMINI_KEYS:
       client = genai.Client(api_key=key)
@@ -190,12 +220,14 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
 
 
 st.markdown(
-    """
-<style>
-div.stButton > button:first-child {background-color: #c92a2a; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
-div.stDownloadButton > button:first-child {background-color: #2b8a3e; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
-</style>
-""",
+    "<style>"
+    "div.stButton > button:first-child {background-color: #c92a2a; color: white;"
+    " font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border:"
+    " none;}"
+    "div.stDownloadButton > button:first-child {background-color: #2b8a3e;"
+    " color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem"
+    " 1.2rem; border: none;}"
+    "</style>",
     unsafe_allow_html=True,
 )
 
@@ -207,7 +239,18 @@ if "report_platform" not in st.session_state:
   st.session_state.report_platform = ""
 
 if st.button("Generate Accurate Growth Report 🔍"):
-  if not video_url.strip():
+  if not st.session_state.is_pro_user and st.session_state.free_used_count >= 1:
+    st.error("🔒 **మీ 1 ఉచిత రిపోర్ట్ పూర్తయింది!**")
+    st.markdown(
+        "### 🚀 Unlimited Growth Reports పొందడానికి Pro Plan ఎంచుకోండి:\n"
+        f"* **1 Month Unlimited Plan — ₹100/-** 👉 [Click Here to Pay"
+        f" ₹100]({PAY_1_MONTH_LINK})\n"
+        f"* **12 Months Unlimited Plan — ₹1,000/-** 👉 [Click Here to Pay"
+        f" ₹1,000]({PAY_12_MONTHS_LINK})\n\n"
+        "*(పేమెంట్ పూర్తయిన వెంటనే వచ్చిన **Access Code** ను ఎడమ వైపు సైడ్‌బార్‌లో ఎంటర్"
+        " చేసి అన్‌లాక్ చేసుకోండి!)*"
+    )
+  elif not video_url.strip():
     st.warning("⚠️ దయచేసి ముందుగా వీడియో లేదా ప్రొఫైల్ లింక్ పేస్ట్ చేయండి.")
   else:
     data_text = ""
@@ -216,16 +259,18 @@ if st.button("Generate Accurate Growth Report 🔍"):
       if platform == "YouTube":
         data_text, stats_obj = fetch_youtube_info(video_url.strip())
       elif platform == "Instagram Reels":
+        ig_host = "instagram-scraper-stable-api.p." + "rapidapi.com"
         data_text = fetch_rapidapi_safe(
-            "https://rapidapi.com",
-            "://rapidapi.com",
+            ig_host,
+            "/get_media_data.php",
             {"reel_post_code_or_url": video_url.strip()},
             f"Instagram Reel ({video_url.strip()})",
         )
       elif platform == "TikTok":
+        tt_host = "tiktok-api23.p." + "rapidapi.com"
         data_text = fetch_rapidapi_safe(
-            "https://rapidapi.com",
-            "://rapidapi.com",
+            tt_host,
+            "/api/post/detail",
             {"url": video_url.strip()},
             f"TikTok Video ({video_url.strip()})",
         )
@@ -237,38 +282,39 @@ if st.button("Generate Accurate Growth Report 🔍"):
             platform, data_text, report_lang, target_audience
         )
         if success:
-          st.session_state.generated_report = result_text
-          st.session_state.report_stats = (
-              stats_obj if platform == "YouTube" else None
-          )
-          st.session_state.report_platform = platform
-        else:
-          st.session_state.generated_report = ""
-          st.error(result_text)
-
+st.session_state.generated_report = result_text
+st.session_state.report_stats = (
+stats_obj if platform == "YouTube" else None
+)
+st.session_state.report_platform = platform
+if not st.session_state.is_pro_user:
+st.session_state.free_used_count += 1
+else:
+st.session_state.generated_report = ""
+st.error(result_text)
 if st.session_state.generated_report:
-  if isinstance(st.session_state.report_stats, dict):
-    m1, m2, m3 = st.columns(3)
-    m1.metric(
-        "👀 Views", f"{int(st.session_state.report_stats.get('viewCount', 0)):,}"
-    )
-    m2.metric(
-        "👍 Likes", f"{int(st.session_state.report_stats.get('likeCount', 0)):,}"
-    )
-    m3.metric(
-        "💬 Comments",
-        f"{int(st.session_state.report_stats.get('commentCount', 0)):,}",
-    )
-  st.success("✅ మీ Growth Report రెడీ అయింది!")
-  file_content = (
-      f"=== TrendSutra AI - {st.session_state.report_platform} Growth"
-      f" Report ===\nPowered by AIENGTEL.com\n\n{st.session_state.generated_report}"
-  )
-  st.download_button(
-      label="📥 Download Growth Report (.txt)",
-      data=file_content,
-      file_name=f"TrendSutra_AI_{st.session_state.report_platform}_Report.txt",
-      mime="text/plain",
-  )
-  st.markdown("---")
-  st.markdown(st.session_state.generated_report)
+if isinstance(st.session_state.report_stats, dict):
+m1, m2, m3 = st.columns(3)
+m1.metric(
+"👀 Views", f"{int(st.session_state.report_stats.get('viewCount', 0)):,}"
+)
+m2.metric(
+"👍 Likes", f"{int(st.session_state.report_stats.get('likeCount', 0)):,}"
+)
+m3.metric(
+"💬 Comments",
+f"{int(st.session_state.report_stats.get('commentCount', 0)):,}",
+)
+st.success("✅ మీ Growth Report రెడీ అయింది!")
+file_content = (
+f"=== TrendSutra AI - {st.session_state.report_platform} Growth"
+f" Report ===\nPowered by AIENGTEL.com\n\n{st.session_state.generated_report}"
+)
+st.download_button(
+label="📥 Download Growth Report (.txt)",
+data=file_content,
+file_name=f"TrendSutra_AI_{st.session_state.report_platform}_Report.txt",
+mime="text/plain",
+)
+st.markdown("---")
+st.markdown(st.session_state.generated_report)
