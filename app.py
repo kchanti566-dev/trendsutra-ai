@@ -50,9 +50,6 @@ cookie_pro = get_cookie("ts_pro_active")
 
 if "free_used_count" not in st.session_state:
   st.session_state.free_used_count = 1 if cookie_free_used == "yes" else 0
-elif cookie_free_used == "yes":
-  st.session_state.free_used_count = 1
-
 if "is_pro_user" not in st.session_state:
   st.session_state.is_pro_user = True if cookie_pro == "yes" else False
 elif cookie_pro == "yes":
@@ -102,7 +99,7 @@ with st.sidebar:
   if st.session_state.is_pro_user:
     st.success("✅ **PRO UNLIMITED ACTIVE!**\n\nమీరు అన్‌లిమిటెడ్ రిపోర్ట్‌లు పొందవచ్చు.")
   else:
-    remaining = max(0, 1 - st.session_state.free_used_count)
+    remaining = max(0, 3 - st.session_state.free_used_count)
     st.info(f"🎁 **Free Trial:** మీకు **{remaining} ఉచిత రిపోర్ట్** మిగిలి ఉంది.")
     st.markdown(
         f"* **1 Month Unlimited:** **₹100/-** 👉 [Pay ₹100 Now]({PAY_1_MONTH_LINK})\n"
@@ -274,7 +271,7 @@ if "report_platform" not in st.session_state:
   st.session_state.report_platform = ""
 
 if st.button("Generate Accurate Growth Report 🔍"):
-  if not st.session_state.is_pro_user and st.session_state.free_used_count >= 1:
+  if not st.session_state.is_pro_user and st.session_state.free_used_count >= 3:
     st.session_state.generated_report = ""
     st.error("🔒 **మీ 1 ఉచిత రిపోర్ట్ పూర్తయింది!**")
     st.markdown(
@@ -323,8 +320,8 @@ if st.button("Generate Accurate Growth Report 🔍"):
           )
           st.session_state.report_platform = platform
           if not st.session_state.is_pro_user:
-            st.session_state.free_used_count = 1
-            set_cookie("ts_free_used", "yes", 365)
+            st.session_state.free_used_count += 1
+            set_cookie("ts_free_used", str(st.session_state.free_used_count), 365)
             st.rerun()
         else:
           st.session_state.generated_report = ""
