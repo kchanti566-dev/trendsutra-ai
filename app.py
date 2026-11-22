@@ -20,10 +20,7 @@ GEMINI_KEYS = [k for k in raw_keys if k]
 YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY", "")
 RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "")
 
-# --- VIP యాక్సెస్ కోడ్‌లు ---
 VALID_VIP_CODES = ("TS100VIP", "TS1000PRO", "ADMIN2026")
-
-# --- పేమెంట్ లింక్‌లు (మీ Razorpay లింక్‌లు తయారయ్యాక ఇక్కడ మార్చుకోండి) ---
 PAY_1_MONTH_LINK = "https://razorpay.com"
 PAY_12_MONTHS_LINK = "https://razorpay.com"
 
@@ -32,7 +29,6 @@ if "free_used_count" not in st.session_state:
 if "is_pro_user" not in st.session_state:
   st.session_state.is_pro_user = False
 
-# --- ఎడమ వైపు సైడ్‌బార్ (Settings + Pricing + VIP Unlock) ---
 with st.sidebar:
   st.markdown("## 🌍 Global & Regional Settings")
   report_lang = st.selectbox(
@@ -62,18 +58,15 @@ with st.sidebar:
         f" Now]({PAY_12_MONTHS_LINK})"
     )
     vip_input = st.text_input(
-        "🔑 పేమెంట్ చేశాక వచ్చిన Access Code ఎంటర్ చేయండి:",
-        type="password",
-        placeholder="ఉదా: TS100VIP",
+        "🔑 Access Code ఎంటర్ చేయండి:", type="password", placeholder="TS100VIP"
     )
     if st.button("Unlock Unlimited Access 🔓"):
       if vip_input.strip().upper() in VALID_VIP_CODES:
         st.session_state.is_pro_user = True
         st.rerun()
       else:
-        st.error("❌ తప్పు కోడ్! దయచేసి సరైన కోడ్ ఇవ్వండి.")
+        st.error("❌ తప్పు కోడ్! సరైన కోడ్ ఇవ్వండి.")
 
-# --- లోగో & టైటిల్ ---
 if os.path.isfile("logo.png"):
   col_logo, col_title = st.columns((1, 5))
   with col_logo:
@@ -101,8 +94,6 @@ with col2:
       "Channel / Profile / Video Link:",
       placeholder="https://youtu.be... లేదా Reel / TikTok లింక్ పేస్ట్ చేయండి",
   )
-
-
 def extract_youtube_id(url):
   pattern = r"(?:v=|\/|live\/|shorts\/)([0-9A-Za-z_-]{11}).*"
   match = re.search(pattern, url)
@@ -150,13 +141,12 @@ def fetch_youtube_info(url):
     except Exception:
       comments.append("కామెంట్లు ఆఫ్ చేసి ఉన్నాయి.")
     summary = (
-        f"Title: {snippet.get('title')}\n"
-        f"Views: {stats.get('viewCount', '0')}, Likes:"
+        f"Title: {snippet.get('title')}\nViews:"
+        f" {stats.get('viewCount', '0')}, Likes:"
         f" {stats.get('likeCount', '0')}, Comments:"
-        f" {stats.get('commentCount', '0')}\n"
-        f"Description: {snippet.get('description', '')[:800]}\n"
-        f"Tags: {snippet.get('tags', ())}\n"
-        f"Top Comments: {comments}"
+        f" {stats.get('commentCount', '0')}\nDescription:"
+        f" {snippet.get('description', '')[:800]}\nTags:"
+        f" {snippet.get('tags', ())}\nTop Comments: {comments}"
     )
     return summary, stats
   except Exception as e:
@@ -220,14 +210,11 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
 
 
 st.markdown(
-    "<style>"
-    "div.stButton > button:first-child {background-color: #c92a2a; color: white;"
-    " font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border:"
-    " none;}"
-    "div.stDownloadButton > button:first-child {background-color: #2b8a3e;"
+    "<style>div.stButton > button:first-child {background-color: #c92a2a;"
     " color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem"
-    " 1.2rem; border: none;}"
-    "</style>",
+    " 1.2rem; border: none;} div.stDownloadButton > button:first-child"
+    " {background-color: #2b8a3e; color: white; font-weight: bold;"
+    " border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}</style>",
     unsafe_allow_html=True,
 )
 
@@ -282,39 +269,40 @@ if st.button("Generate Accurate Growth Report 🔍"):
             platform, data_text, report_lang, target_audience
         )
         if success:
-st.session_state.generated_report = result_text
-st.session_state.report_stats = (
-stats_obj if platform == "YouTube" else None
-)
-st.session_state.report_platform = platform
-if not st.session_state.is_pro_user:
-st.session_state.free_used_count += 1
-else:
-st.session_state.generated_report = ""
-st.error(result_text)
+          st.session_state.generated_report = result_text
+          st.session_state.report_stats = (
+              stats_obj if platform == "YouTube" else None
+          )
+          st.session_state.report_platform = platform
+          if not st.session_state.is_pro_user:
+            st.session_state.free_used_count += 1
+        else:
+          st.session_state.generated_report = ""
+          st.error(result_text)
+
 if st.session_state.generated_report:
-if isinstance(st.session_state.report_stats, dict):
-m1, m2, m3 = st.columns(3)
-m1.metric(
-"👀 Views", f"{int(st.session_state.report_stats.get('viewCount', 0)):,}"
-)
-m2.metric(
-"👍 Likes", f"{int(st.session_state.report_stats.get('likeCount', 0)):,}"
-)
-m3.metric(
-"💬 Comments",
-f"{int(st.session_state.report_stats.get('commentCount', 0)):,}",
-)
-st.success("✅ మీ Growth Report రెడీ అయింది!")
-file_content = (
-f"=== TrendSutra AI - {st.session_state.report_platform} Growth"
-f" Report ===\nPowered by AIENGTEL.com\n\n{st.session_state.generated_report}"
-)
-st.download_button(
-label="📥 Download Growth Report (.txt)",
-data=file_content,
-file_name=f"TrendSutra_AI_{st.session_state.report_platform}_Report.txt",
-mime="text/plain",
-)
-st.markdown("---")
-st.markdown(st.session_state.generated_report)
+  if isinstance(st.session_state.report_stats, dict):
+    m1, m2, m3 = st.columns(3)
+    m1.metric(
+        "👀 Views", f"{int(st.session_state.report_stats.get('viewCount', 0)):,}"
+    )
+    m2.metric(
+        "👍 Likes", f"{int(st.session_state.report_stats.get('likeCount', 0)):,}"
+    )
+    m3.metric(
+        "💬 Comments",
+        f"{int(st.session_state.report_stats.get('commentCount', 0)):,}",
+    )
+  st.success("✅ మీ Growth Report రెడీ అయింది!")
+  file_content = (
+      f"=== TrendSutra AI - {st.session_state.report_platform} Growth"
+      f" Report ===\nPowered by AIENGTEL.com\n\n{st.session_state.generated_report}"
+  )
+  st.download_button(
+      label="📥 Download Growth Report (.txt)",
+      data=file_content,
+      file_name=f"TrendSutra_AI_{st.session_state.report_platform}_Report.txt",
+      mime="text/plain",
+  )
+  st.markdown("---")
+  st.markdown(st.session_state.generated_report)
