@@ -32,7 +32,7 @@ if "free_used_count" not in st.session_state:
 if "is_pro_user" not in st.session_state:
   st.session_state.is_pro_user = False
 
-# --- ఎడమ వైపు సైడ్‌బార్ ---
+# --- ఎడమ వైపు సైడ్‌బార్ (Settings + Pricing + VIP Unlock) ---
 with st.sidebar:
   st.markdown("## 🌍 Global & Regional Settings")
   report_lang = st.selectbox(
