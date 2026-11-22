@@ -41,11 +41,11 @@ YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY", "")
 RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "")
 
 # --- మీ Google Sheet Apps Script Web App URL ---
-GOOGLE_SHEET_API = "https://google.com"
+GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbzEkkgxBP7aOKIXkEiOG7_rWc0quvnvTVqQDSWUAMk2zOPN7W8Ue_uOPwH7edmJJtEd/exec"
 
 # --- మీ రెండు పూర్తి Razorpay పేమెంట్ లింక్‌లను ఇక్కడ పేస్ట్ చేయండి ---
-PAY_1_MONTH_LINK = "https://rzp.io"
-PAY_12_MONTHS_LINK = "https://rzp.io"
+PAY_1_MONTH_LINK = "https://rzp.io/rzp/yop8jYS"
+PAY_12_MONTHS_LINK = "https://rzp.io/rzp/sjonGmqw"
 
 cookie_free_used = get_cookie("ts_free_used_v3")
 cookie_pro = get_cookie("ts_pro_active")
