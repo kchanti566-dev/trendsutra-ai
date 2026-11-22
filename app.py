@@ -23,7 +23,7 @@ st.markdown(
     div[data-testid="stToolbarActions"] {display: none !important;}
     header[data-testid="stHeader"] {height: 1.5rem !important; background: transparent !important;}
     .block-container {padding-top: 0rem !important; margin-top: -2.2rem !important; padding-bottom: 1rem !important;}
-    section[data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important; margin-top: -1.5rem !important;}
+    section[data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important; margin-top: -0.5rem !important;}
     div[data-testid="stSidebarUserContent"] {padding-top: 0rem !important;}
     div.stButton > button:first-child {background-color: #c92a2a; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
     div.stDownloadButton > button:first-child {background-color: #2b8a3e; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
@@ -44,27 +44,29 @@ RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "")
 GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbzEkkgxBP7aOKIXkEiOG7_rWc0quvnvTVqQDSWUAMk2zOPN7W8Ue_uOPwH7edmJJtEd/exec"
 
 # --- మీ రెండు పూర్తి Razorpay పేమెంట్ లింక్‌లను ఇక్కడ పేస్ట్ చేయండి ---
+# --- మీ రెండు పూర్తి Razorpay లింక్‌లను ఇక్కడ పేస్ట్ చేయండి ---
 PAY_1_MONTH_LINK = "https://rzp.io/rzp/yop8jYS"
 PAY_12_MONTHS_LINK = "https://rzp.io/rzp/sjonGmqw"
 
-cookie_free_used = get_cookie("ts_free_used_v3")
-cookie_pro = get_cookie("ts_pro_active")
+# --- పేజీ Refresh చేసిన క్షణంలోనే కుకీ చదివే శాశ్వత విధానం ---
+raw_cookies = st.context.cookies
+cookie_free_used = raw_cookies.get("ts_free_used_v3", "0")
+cookie_pro = raw_cookies.get("ts_pro_active", "no")
 
 if "free_used_count" not in st.session_state:
   st.session_state.free_used_count = (
-      int(cookie_free_used)
-      if (cookie_free_used and str(cookie_free_used).isdigit())
-      else 0
+      int(cookie_free_used) if str(cookie_free_used).isdigit() else 0
   )
-elif cookie_free_used and str(cookie_free_used).isdigit():
+elif str(cookie_free_used).isdigit():
   st.session_state.free_used_count = max(
       st.session_state.free_used_count, int(cookie_free_used)
   )
 
 if "is_pro_user" not in st.session_state:
-  st.session_state.is_pro_user = True if cookie_pro == "yes" else False
+  st.session_state.is_pro_user = cookie_pro == "yes"
 elif cookie_pro == "yes":
   st.session_state.is_pro_user = True
+
 
 
 def verify_payment_id(pid):
