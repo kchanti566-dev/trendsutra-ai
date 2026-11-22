@@ -68,16 +68,15 @@ elif cookie_pro == "yes":
   st.session_state.is_pro_user = True
 
 
-def verify_payment_id(pid):
-  if not pid or not pid.strip().startswith("pay_"):
-    return "INVALID"
-  try:
-    res = requests.get(
-        GOOGLE_SHEET_API, params={"pid": pid.strip()}, timeout=10
-    )
-    return res.text.strip()
-  except Exception:
-    return "ERROR"
+ def verify_payment_id(pid):
+     if not pid or not pid.strip().startswith("pay_"):
+       return "INVALID"
+     try:
+       full_url = f"{GOOGLE_SHEET_API}?pid={pid.strip()}"
+       res = requests.get(full_url, allow_redirects=True, timeout=15)
+       return res.text.strip()
+     except Exception as e:
+       return f"ERROR: {str(e)}"
 
 
 url_pid = st.query_params.get("razorpay_payment_id", "")
