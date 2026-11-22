@@ -91,46 +91,43 @@ if url_pid and not st.session_state.is_pro_user:
     st.sidebar.error("⚠️ ఈ Payment ID ఇప్పటికే వాడబడింది!")
 
 with st.sidebar:
-  st.markdown("## 🌍 Global & Regional Settings")
+  st.markdown("### 🌍 Settings")
   report_lang = st.selectbox(
-      "Report Language / భాషను ఎంచుకోండి:",
+      "Report Language / భాష:",
       ("English (Global)", "Telugu (తెలుగు)", "Tenglish"),
   )
   target_audience = st.radio(
-      "Target Audience / ఆడియన్స్ రకం:",
-      (
-          "Regional / Local Audience",
-          "Global / International Audience",
-          "Both (Global + Regional)",
-      ),
+      "Target Audience:",
+      ("Regional / Local", "Global / International", "Both (Global + Local)"),
   )
 
-  st.markdown("---")
-  st.markdown("## 💎 Pro Plans (Unlimited)")
+  st.markdown("### 💎 Pro Plans (Unlimited)")
 
   if st.session_state.is_pro_user:
-    st.success("✅ **PRO UNLIMITED ACTIVE!**\n\nమీరు అన్‌లిమిటెడ్ రిపోర్ట్‌లు పొందవచ్చు.")
+    st.success("✅ **PRO UNLIMITED ACTIVE!**\n\nఅన్‌లిమిటెడ్ రిపోర్ట్‌లు పొందవచ్చు.")
   else:
     remaining = max(0, 3 - st.session_state.free_used_count)
-    st.info(f"🎁 **Free Trial:** మీకు **{remaining} ఉచిత రిపోర్ట్‌లు** మిగిలి ఉన్నాయి.")
+    st.caption(f"🎁 **Free Trial:** మీకు **{remaining} ఉచిత రిపోర్ట్‌లు** మిగిలి ఉన్నాయి.")
     st.markdown(
-        f"* **1 Month Unlimited:** **₹100/-** 👉 [Pay ₹100 Now]({PAY_1_MONTH_LINK})\n"
-        f"* **12 Months Unlimited:** **₹1,000/-** 👉 [Pay ₹1,000"
-        f" Now]({PAY_12_MONTHS_LINK})"
+        f"• **1 Month:** **₹100/-** 👉 [Pay ₹100]({PAY_1_MONTH_LINK})  \n• **12"
+        f" Months:** **₹1,000/-** 👉 [Pay ₹1,000]({PAY_12_MONTHS_LINK})"
     )
     manual_pid = st.text_input(
-        "🔑 Payment ID (pay_...):", placeholder="pay_P9x82kLm01"
+        "🔑 Payment ID (pay_...):",
+        placeholder="pay_P9x82kLm01",
+        label_visibility="collapsed",
     )
-    if st.button("Verify & Unlock 🔓"):
+    if st.button("Unlock with Payment ID 🔓"):
       res_status = verify_payment_id(manual_pid)
       if res_status == "VALID":
         st.session_state.is_pro_user = True
         set_cookie("ts_pro_active", "yes", 30)
         st.rerun()
       elif res_status == "ALREADY_USED":
-        st.error("❌ ఈ Payment ID ఇప్పటికే వేరే వారు వాడారు!")
+        st.error("❌ ఈ Payment ID ఇప్పటికే వాడారు!")
       else:
-        st.error("❌ సరైన Razorpay Payment ID ఇవ్వండి.")
+        st.error("❌ సరైన Payment ID ఇవ్వండి.")
+
 if os.path.isfile("logo.png"):
   col_logo, col_title = st.columns((1, 5))
   with col_logo:
