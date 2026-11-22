@@ -260,6 +260,7 @@ if "report_platform" not in st.session_state:
 if st.button("Generate Accurate Growth Report 🔍"):
   if not st.session_state.is_pro_user and st.session_state.free_used_count >= 1:
     st.error("🔒 **మీ 1 ఉచిత రిపోర్ట్ పూర్తయింది!**")
+    st.session_state.generated_report = ""
     st.markdown(
         "### 🚀 Unlimited Growth Reports పొందడానికి Pro Plan ఎంచుకోండి:\n"
         f"* **1 Month Unlimited Plan — ₹100/-** 👉 [Click Here to Pay"
