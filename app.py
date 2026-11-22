@@ -93,9 +93,10 @@ def fetch_youtube_info(url):
     vid_res = (
         youtube.videos().list(part="snippet,statistics", id=vid_id).execute()
     )
-    if not vid_res.get("items"):
+    items_list = vid_res.get("items", [])
+    if not items_list:
       return None, "ఈ వీడియో వివరాలు దొరకలేదు (ప్రైవేట్ వీడియో కావచ్చు)."
-    item = vid_res["items"][0]
+    item = items_list[0]
     snippet = item["snippet"]
     stats = item.get("statistics", {})
     comments = []
@@ -151,7 +152,7 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
     
     CRITICAL LANGUAGE & TONE RULES:
     - Output Language: {lang}
-    - If {lang} is Telugu: Write in simple, natural, everyday spoken Telugu like a friend explaining to another friend (use common English words like Views, Comments, Title, Thumbnail, Hook, Reach, Subscribers naturally in Telugu script or English). STRICTLY AVOID bookish, formal, or old Telugu words like "ప్రేక్షకుల నాడి", "విశ్లేషణ ప్రకారం", "వ్యూహాత్మక", etc.
+    - If {lang} is Telugu: Write in simple, natural, everyday spoken Telugu like a friend explaining to another friend (use common English words like Views, Comments, Title, Thumbnail, Hook, Reach, Subscribers naturally). STRICTLY AVOID bookish or formal Telugu words like "ప్రేక్షకుల నాడి", "విశ్లేషణ ప్రకారం", "వ్యూహాత్మక", etc.
     - Target Audience: {audience}
     - Start with 1 simple line mentioning "TrendSutra AI" (e.g., "TrendSutra AI ఇచ్చిన మీ ఛానెల్ గ్రోత్ రిపోర్ట్ ఇక్కడ ఉంది:"), then go straight to Section 1.
     
