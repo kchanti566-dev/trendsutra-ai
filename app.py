@@ -349,6 +349,7 @@ if st.button("Generate Accurate Growth Report 🔍"):
             set_cookie(
                 "ts_free_used_v3", str(st.session_state.free_used_count), 365
             )
+            time.sleep(0.6)
             st.rerun()
         else:
           st.session_state.generated_report = ""
