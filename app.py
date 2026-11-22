@@ -20,14 +20,42 @@ GEMINI_KEYS = [k for k in raw_keys if k]
 YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY", "")
 RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "")
 
-VALID_VIP_CODES = ("TS100VIP", "TS1000PRO", "ADMIN2026")
-PAY_1_MONTH_LINK = "https://razorpay.com"
-PAY_12_MONTHS_LINK = "https://razorpay.com"
+# --- మీ Google Sheets వన్-టైమ్ వెరిఫికేషన్ లింక్ ---
+GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbyszYZ_JaSSn2swWYfy9VkcbKE_hAY5ClWTIJ_qVhk6mBBmEc-R1wVDg7-Edr8t6RiU/exec"
+
+# --- మీ రెండు పూర్తి Razorpay పేమెంట్ లింక్‌లను ఇక్కడ పేస్ట్ చేయండి ---
+PAY_1_MONTH_LINK = "https://rzp.io/rzp/yop8jYS"  # ఇక్కడ పూర్తి ₹100 లింక్ పేస్ట్ చేయండి
+PAY_12_MONTHS_LINK = (
+    "https://rzp.io/rzp/sjonGmqw"  # ఇక్కడ పూర్తి ₹1000 లింక్ పేస్ట్ చేయండి
+)
 
 if "free_used_count" not in st.session_state:
   st.session_state.free_used_count = 0
 if "is_pro_user" not in st.session_state:
   st.session_state.is_pro_user = False
+
+
+def verify_payment_id(pid):
+  if not pid or not pid.strip().startswith("pay_"):
+    return "INVALID"
+  try:
+    res = requests.get(
+        GOOGLE_SHEET_API, params={"pid": pid.strip()}, timeout=10
+    )
+    return res.text.strip()
+  except Exception:
+    return "ERROR"
+
+
+# --- Razorpay నుండి పేమెంట్ అయి తిరిగి రాగానే ఆటోమేటిక్ అన్‌లాక్ ---
+url_pid = st.query_params.get("razorpay_payment_id", "")
+if url_pid and not st.session_state.is_pro_user:
+  status = verify_payment_id(url_pid)
+  if status == "VALID":
+    st.session_state.is_pro_user = True
+    st.toast("🎉 Payment Verified! Unlimited Pro Access Unlocked!")
+  elif status == "ALREADY_USED":
+    st.sidebar.error("⚠️ ఈ Payment ID ఇప్పటికే వాడబడింది (Already Used)!")
 
 with st.sidebar:
   st.markdown("## 🌍 Global & Regional Settings")
@@ -57,16 +85,18 @@ with st.sidebar:
         f"* **12 Months Unlimited:** **₹1,000/-** 👉 [Pay ₹1,000"
         f" Now]({PAY_12_MONTHS_LINK})"
     )
-    vip_input = st.text_input(
-        "🔑 Access Code ఎంటర్ చేయండి:", type="password", placeholder="TS100VIP"
+    manual_pid = st.text_input(
+        "🔑 Payment ID (pay_...):", placeholder="pay_P9x82kLm01"
     )
-    if st.button("Unlock Unlimited Access 🔓"):
-      if vip_input.strip().upper() in VALID_VIP_CODES:
+    if st.button("Verify & Unlock 🔓"):
+      res_status = verify_payment_id(manual_pid)
+      if res_status == "VALID":
         st.session_state.is_pro_user = True
         st.rerun()
+      elif res_status == "ALREADY_USED":
+        st.error("❌ ఈ Payment ID ఇప్పటికే వేరే వారు వాడారు!")
       else:
-        st.error("❌ తప్పు కోడ్! సరైన కోడ్ ఇవ్వండి.")
-
+        st.error("❌ సరైన Razorpay Payment ID ఇవ్వండి.")
 if os.path.isfile("logo.png"):
   col_logo, col_title = st.columns((1, 5))
   with col_logo:
@@ -94,6 +124,8 @@ with col2:
       "Channel / Profile / Video Link:",
       placeholder="https://youtu.be... లేదా Reel / TikTok లింక్ పేస్ట్ చేయండి",
   )
+
+
 def extract_youtube_id(url):
   pattern = r"(?:v=|\/|live\/|shorts\/)([0-9A-Za-z_-]{11}).*"
   match = re.search(pattern, url)
@@ -234,8 +266,7 @@ if st.button("Generate Accurate Growth Report 🔍"):
         f" ₹100]({PAY_1_MONTH_LINK})\n"
         f"* **12 Months Unlimited Plan — ₹1,000/-** 👉 [Click Here to Pay"
         f" ₹1,000]({PAY_12_MONTHS_LINK})\n\n"
-        "*(పేమెంట్ పూర్తయిన వెంటనే వచ్చిన **Access Code** ను ఎడమ వైపు సైడ్‌బార్‌లో ఎంటర్"
-        " చేసి అన్‌లాక్ చేసుకోండి!)*"
+        "*(పేమెంట్ పూర్తయిన వెంటనే మీ అకౌంట్ ఆటోమేటిక్‌గా అన్‌లాక్ అవుతుంది!)*"
     )
   elif not video_url.strip():
     st.warning("⚠️ దయచేసి ముందుగా వీడియో లేదా ప్రొఫైల్ లింక్ పేస్ట్ చేయండి.")
