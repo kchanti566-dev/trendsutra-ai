@@ -20,6 +20,8 @@ st.markdown(
     <style>
     #MainMenu {visibility: hidden !important;}
     footer {visibility: hidden !important;}
+    div[class*="viewerBadge"] {display: none !important;}
+    div[class*="profileContainer"], a[href*="streamlit.io/cloud"] {display: none !important;}
     .stDeployButton {display: none !important;}
     div[data-testid="stToolbarActions"] {display: none !important;}
     header[data-testid="stHeader"] {height: 0.5rem !important; background: transparent !important;}
