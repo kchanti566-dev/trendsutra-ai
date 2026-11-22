@@ -19,7 +19,8 @@ st.markdown(
     """
     <style>
     #MainMenu {visibility: hidden !important;}
-    header {visibility: hidden !important;}
+    header[data-testid="stHeader"] {background: transparent !important;}
+    button[data-testid="stExpandSidebarButton"] {visibility: visible !important; color: white !important;}
     footer {visibility: hidden !important;}
     .stDeployButton {display: none !important;}
     div[data-testid="stToolbar"] {display: none !important;}
