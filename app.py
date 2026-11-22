@@ -22,7 +22,10 @@ st.markdown(
     footer {visibility: hidden !important;}
     .stDeployButton {display: none !important;}
     div[data-testid="stToolbarActions"] {display: none !important;}
-    .block-container {padding-top: 1.5rem !important; padding-bottom: 1rem !important;}
+    header[data-testid="stHeader"] {height: 2rem !important; background: transparent !important;}
+    .block-container {padding-top: 0.5rem !important; padding-bottom: 1rem !important;}
+    section[data-testid="stSidebar"] > div:first-child {padding-top: 0.5rem !important;}
+    div[data-testid="stSidebarUserContent"] {padding-top: 0.5rem !important;}
     div.stButton > button:first-child {background-color: #c92a2a; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
     div.stDownloadButton > button:first-child {background-color: #2b8a3e; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
     </style>
