@@ -281,23 +281,23 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
         "gemini-2.5-pro",
   )
   last_err = "API Key missing in Secrets"
-    for key in GEMINI_KEYS:
-      clean_key = key.strip()
-      if not clean_key:
-        continue
-      for m in models_list:
-        try:
-          u = f"https://googleapis.com{m}:generateContent?key={clean_key}"
-          r = requests.post(
-              u, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30
-          )
-          if r.status_code == 200:
-            t = r.json()["candidates"]["content"]["parts"]["text"]
-            if t:
-              return True, t
-          last_err = f"HTTP {r.status_code}: {r.text[:100]}"
-          time.sleep(2)
-        except Exception as e:
+  for key in GEMINI_KEYS:
+    clean_key = key.strip()
+    if not clean_key:
+      continue
+    for m in models_list:
+      try:
+        u = f"https://googleapis.com{m}:generateContent?key={clean_key}"
+        r = requests.post(
+            u, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30
+        )
+        if r.status_code == 200:
+          t = r.json()["candidates"]["content"]["parts"]["text"]
+          if t:
+            return True, t
+        last_err = f"HTTP {r.status_code}: {r.text[:100]}"
+        time.sleep(2)
+      except Exception as e:
           last_err = str(e)
     return False, f"⚠️ AI Error: {last_err}"
 
