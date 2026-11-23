@@ -16,10 +16,7 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    #MainMenu {visibility: hidden !important;}
-    footer {visibility: hidden !important;}
-    .stDeployButton {display: none !important;}
-    div[data-testid="stToolbarActions"] {display: none !important;}
+    #MainMenu, footer, .stDeployButton, div[data-testid="stToolbarActions"] {display: none !important;}
     header[data-testid="stHeader"] {height: 1.5rem !important; background: transparent !important;}
     .block-container {padding-top: 0rem !important; margin-top: -2.2rem !important; padding-bottom: 1rem !important;}
     section[data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important; margin-top: -1.5rem !important;}
@@ -31,17 +28,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-raw_keys = (
-    st.secrets.get("GEMINI_API_KEY", ""),
-    st.secrets.get("GEMINI_API_KEY_2", ""),
-)
-GEMINI_KEYS = [k for k in raw_keys if k]
+GEMINI_KEYS = [
+    k
+    for k in (
+        st.secrets.get("GEMINI_API_KEY", ""),
+        st.secrets.get("GEMINI_API_KEY_2", ""),
+    )
+    if k
+]
 YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY", "")
 RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "")
 
-GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbzEkkgxBP7aOKIXkEiOG7_rWc0quvnvTVqQDSWUAMk2zOPN7W8Ue_uOPwH7edmJJtEd/exec"
-PAY_1_MONTH_LINK = "https://rzp.io/rzp/yop8jYS"
-PAY_12_MONTHS_LINK = "https://rzp.io/rzp/sjonGmqw"
+GOOGLE_SHEET_API = "https://google.com"
+PAY_1_MONTH_LINK = "https://rzp.io"
+PAY_12_MONTHS_LINK = "https://rzp.io"
 
 ls_free = streamlit_js_eval(
     js_expressions="localStorage.getItem('ts_device_free_v5')", key="ls_get_free"
@@ -55,17 +55,12 @@ if "free_used_count" not in st.session_state:
 if "is_pro_user" not in st.session_state:
   st.session_state.is_pro_user = False
 
-if ls_free and str(ls_free).isdigit():
-  saved_count = int(ls_free)
-  if saved_count > st.session_state.free_used_count:
-    st.session_state.free_used_count = saved_count
-    st.rerun()
-
+if ls_free and str(ls_free).isdigit() and int(ls_free) > st.session_state.free_used_count:
+  st.session_state.free_used_count = int(ls_free)
+  st.rerun()
 if ls_pro == "yes" and not st.session_state.is_pro_user:
   st.session_state.is_pro_user = True
   st.rerun()
-
-
 def verify_payment_id(pid):
   if not pid:
     return "INVALID"
@@ -76,10 +71,11 @@ def verify_payment_id(pid):
   if not clean_pid.startswith("pay_"):
     return "INVALID"
   try:
-    full_url = f"{GOOGLE_SHEET_API}?pid={clean_pid}"
-    headers = {"User-Agent": "Mozilla/5.0"}
     res = requests.get(
-        full_url, headers=headers, allow_redirects=True, timeout=15
+        f"{GOOGLE_SHEET_API}?pid={clean_pid}",
+        headers={"User-Agent": "Mozilla/5.0"},
+        allow_redirects=True,
+        timeout=15,
     )
     txt = res.text.strip()
     if "ALREADY_USED" in txt:
@@ -116,9 +112,7 @@ with st.sidebar:
       "Target Audience:",
       ("Regional / Local", "Global / International", "Both (Global + Local)"),
   )
-
   st.markdown("### 💎 Pro Plans (Unlimited)")
-
   if st.session_state.is_pro_user:
     st.success("✅ **PRO UNLIMITED ACTIVE!**\n\nఅన్‌లిమిటెడ్ రిపోర్ట్‌లు పొందవచ్చు.")
   else:
@@ -129,7 +123,7 @@ with st.sidebar:
         f" Months:** **₹1,000/-** 👉 [Pay ₹1,000]({PAY_12_MONTHS_LINK})"
     )
     manual_pid = st.text_input(
-        "🔑 Payment ID (pay_...):",
+        "🔑 Payment ID:",
         placeholder="pay_P9x82kLm01",
         label_visibility="collapsed",
     )
@@ -148,8 +142,81 @@ with st.sidebar:
         st.rerun()
       elif res_status == "ALREADY_USED":
         st.error(
-            "❌ ఈ Payment ID గరిష్టంగా 3 డివైజ్‌లలో వాడబడింది! ఫోన్ మార్చినట్లయితే"
-            " admin@aiengtel.com కి మెసేజ్ చేయండి."
+            "❌ ఈ Payment ID గరిష్టంగా 3 డివైజ్‌లలో వాడబడింది! support@aiengtel.com కి"
+            " మెసేజ్ చేయండి."
         )
       else:
         st.error("❌ సరైన Payment ID ఇవ్వండి.")
+# --- STEP 3.1: FETCH SOCIAL MEDIA DATA ---
+def fetch_social_data(platform, url_or_topic):
+    # YouTube కోసం oEmbed API (API Key అవసరం లేకుండానే టైటిల్, ఛానల్ వివరాలు వస్తాయి)
+    if platform == "YouTube" and ("youtube.com" in url_or_topic or "youtu.be" in url_or_topic):
+        try:
+            oembed_url = f"https://youtube.com{url_or_topic}&format=json"
+            res = requests.get(oembed_url, timeout=10)
+            if res.status_code == 200:
+                data = res.json()
+                return f"Title: {data.get('title')}, Author: {data.get('author_name')}"
+        except Exception as e:
+            return f"Topic/URL: {url_or_topic} (Metadata fetch skipped)"
+            
+    # Instagram Reels / TikTok కోసం డైరెక్ట్ స్క్రాపింగ్ బ్లాక్ అవుతుంది కాబట్టి ఇన్‌పుట్‌ను నేరుగా పంపుతాము
+    return f"Platform: {platform} | Input/Link: {url_or_topic}"
+# --- STEP 3.2: GEMINI REST API CALL ---
+def generate_growth_report(api_key, platform, content_info, niche):
+    url = f"https://googleapis.com{api_key}"
+    headers = {"Content-Type": "application/json"}
+    
+    prompt = f"""
+    Act as a viral social media strategist. Analyze this {platform} content in the '{niche}' niche:
+    {content_info}
+    
+    Provide a structured Growth Report with:
+    1. Viral Hook Ideas (3 options)
+    2. Trending Hashtags & SEO Keywords
+    3. Content Improvement Tips for higher retention
+    4. Best Posting Strategy
+    """
+    
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}]
+    }
+    
+    response = requests.post(url, headers=headers, json=payload)
+    if response.status_code == 200:
+        return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+    else:
+        return f"Error {response.status_code}: {response.text}"
+# --- STEP 3.3: UI INPUTS & BUTTON ---
+st.subheader("🚀 Generate Viral Growth Report")
+
+col1, col2 = st.columns(2)
+with col1:
+    platform = st.selectbox("Select Platform", ["YouTube", "Instagram Reels", "TikTok"])
+with col2:
+    niche = st.text_input("Your Niche / Category", placeholder="ఉదా: Tech, Cooking, Fitness")
+
+url_or_topic = st.text_input("Paste Video Link or Enter Topic", placeholder="YouTube URL లేదా వీడియో టాపిక్...")
+
+generate_btn = st.button("✨ Generate Growth Report", type="primary", use_container_width=True)
+# --- STEP 3.4: EXECUTION & OUTPUT ---
+if generate_btn:
+    if not GEMINI_API_KEY:  # Step 1 లో మీరు ఇచ్చిన API Key వేరియబుల్ పేరు ఇక్కడ ఉండాలి
+        st.error("దయచేసి ముందుగా Gemini API Key ఎంటర్ చేయండి!")
+    elif not url_or_topic:
+        st.warning("దయచేసి వీడియో లింక్ లేదా టాపిక్ ఇవ్వండి.")
+    else:
+        with st.spinner("TrendSutra AI అనలైజ్ చేస్తోంది..."):
+            fetched_data = fetch_social_data(platform, url_or_topic)
+            report = generate_growth_report(GEMINI_API_KEY, platform, fetched_data, niche)
+            
+            st.success("రిపోర్ట్ సిద్ధమైంది!")
+            st.markdown(report)
+            
+            # రిపోర్ట్ డౌన్‌లోడ్ బటన్
+            st.download_button(
+                label="📥 Download Report (.txt)",
+                data=report,
+                file_name=f"TrendSutra_{platform}_Report.txt",
+                mime="text/plain"
+            )
