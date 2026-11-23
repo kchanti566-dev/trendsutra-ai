@@ -279,8 +279,8 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
         "gemini-3.5-flash",
         "gemini-3.5-flash-lite",
         "gemini-2.5-pro",
-    )
-    last_err = "API Key missing in Secrets"
+  )
+  last_err = "API Key missing in Secrets"
     for key in GEMINI_KEYS:
       clean_key = key.strip()
       if not clean_key:
