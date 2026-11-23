@@ -23,7 +23,7 @@ st.markdown(
     div[data-testid="stToolbarActions"] {display: none !important;}
     header[data-testid="stHeader"] {height: 1.5rem !important; background: transparent !important;}
     .block-container {padding-top: 0rem !important; margin-top: -2.2rem !important; padding-bottom: 1rem !important;}
-    section[data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important; margin-top: -0rem !important;}
+    section[data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important; margin-top: -5rem !important;}
     div[data-testid="stSidebarUserContent"] {padding-top: 0rem !important;}
     div.stButton > button:first-child {background-color: #c92a2a; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
     div.stDownloadButton > button:first-child {background-color: #2b8a3e; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
@@ -276,25 +276,31 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
       "5. 🚀 **రాబోయే 30 రోజుల్లో చేయాల్సిన 3 ముఖ్య పనులు (పని 1, పని 2, పని 3)**"
   )
   models_list = ("gemini-2.5-flash", "gemini-2.5-flash-lite")
-       last_err = ""
-       for attempt in range(2):
-         for key in GEMINI_KEYS:
-           if not key or not key.strip():
-             continue
-           client = genai.Client(api_key=key.strip())
-           for model_name in models_list:
-             try:
-               resp = client.models.generate_content(
-                   model=model_name, contents=prompt
-               )
-               if resp and resp.text:
-                 return True, resp.text
-             except Exception as e:
-               last_err = str(e)
-               time.sleep(1)
-               continue
-       return False, f"⚠️ AI లోపం: {last_err[:120]}"
-
+  last_err = "No API key found in Secrets"
+  for key in GEMINI_KEYS:
+    clean_key = key.strip()
+    if not clean_key:
+      continue
+    for model_name in models_list:
+      try:
+        url = f"https://googleapis.com{model_name}:generateContent?key={clean_key}"
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        res = requests.post(url, json=payload, timeout=25)
+        if res.status_code == 200:
+          data = res.json()
+          text = (
+              data.get("candidates", [{}])[0]
+              .get("content", {})
+              .get("parts", [{}])[0]
+              .get("text", "")
+          )
+          if text:
+            return True, text
+        else:
+          last_err = f"HTTP {res.status_code}: {res.text[:120]}"
+      except Exception as e:
+        last_err = str(e)
+  return False, f"⚠️ AI వివరాలు: {last_err}"
 
 if "generated_report" not in st.session_state:
   st.session_state.generated_report = ""
