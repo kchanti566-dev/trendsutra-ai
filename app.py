@@ -135,7 +135,7 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
                 u = f"https://googleapis.com{m}:generateContent?key={key.strip()}"
                 r = requests.post(u, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=25)
                 if r.status_code == 200:
-                    t = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    t = r.json()["candidates"]["content"]["parts"]["text"]
                     if t: return True, t
                 last_err = f"HTTP {r.status_code}: {r.text[:100]}"
             except Exception as e: last_err = str(e)
