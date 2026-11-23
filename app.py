@@ -23,7 +23,7 @@ st.markdown(
     div[data-testid="stToolbarActions"] {display: none !important;}
     header[data-testid="stHeader"] {height: 1.5rem !important; background: transparent !important;}
     .block-container {padding-top: 0rem !important; margin-top: -2.2rem !important; padding-bottom: 1rem !important;}
-    section[data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important; margin-top: -1.5rem !important;}
+    section[data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important; margin-top: -0rem !important;}
     div[data-testid="stSidebarUserContent"] {padding-top: 0rem !important;}
     div.stButton > button:first-child {background-color: #c92a2a; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
     div.stDownloadButton > button:first-child {background-color: #2b8a3e; color: white; font-weight: bold; border-radius: 6px; padding: 0.5rem 1.2rem; border: none;}
@@ -275,24 +275,25 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
       "4. 🔍 **Views పెరగడానికి Title, Description & Tags మార్పులు**\n"
       "5. 🚀 **రాబోయే 30 రోజుల్లో చేయాల్సిన 3 ముఖ్య పనులు (పని 1, పని 2, పని 3)**"
   )
-  models_list = ("gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash")
-  for attempt in range(2):
-    for key in GEMINI_KEYS:
-      client = genai.Client(api_key=key)
-      for model_name in models_list:
-        try:
-          resp = client.models.generate_content(
-              model=model_name, contents=prompt
-          )
-          if resp and resp.text:
-            return True, resp.text
-        except Exception:
-          time.sleep(1.5)
-          continue
-  return (
-      False,
-      "⚠️ AI సర్వర్ ప్రస్తుతం బిజీగా ఉంది. దయచేసి 5 సెకన్ల తర్వాత మళ్ళీ క్లిక్ చేయండి.",
-  )
+  models_list = ("gemini-2.5-flash", "gemini-2.5-flash-lite")
+       last_err = ""
+       for attempt in range(2):
+         for key in GEMINI_KEYS:
+           if not key or not key.strip():
+             continue
+           client = genai.Client(api_key=key.strip())
+           for model_name in models_list:
+             try:
+               resp = client.models.generate_content(
+                   model=model_name, contents=prompt
+               )
+               if resp and resp.text:
+                 return True, resp.text
+             except Exception as e:
+               last_err = str(e)
+               time.sleep(1)
+               continue
+       return False, f"⚠️ AI లోపం: {last_err[:120]}"
 
 
 if "generated_report" not in st.session_state:
