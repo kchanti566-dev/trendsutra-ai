@@ -275,31 +275,32 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
       "4. 🔍 **Views పెరగడానికి Title, Description & Tags మార్పులు**\n"
       "5. 🚀 **రాబోయే 30 రోజుల్లో చేయాల్సిన 3 ముఖ్య పనులు (పని 1, పని 2, పని 3)**"
   )
-  models_list = (
-      "gemini-3.5-flash-lite",
-      "gemini-3.8-flash",
-      "gemini-3.5-flash-lite",
+      models_list = (
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-2.5-pro",
     )
-
-  last_err = "API Key missing in Secrets"
-  for key in GEMINI_KEYS:
-    clean_key = key.strip()
-    if not clean_key:
-      continue
-    for m in models_list:
-      try:
-        u = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={clean_key}"
-        r = requests.post(
-            u, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=25
-        )
-        if r.status_code == 200:
-          t = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-          if t:
-            return True, t
-        last_err = f"HTTP {r.status_code}: {r.text[:100]}"
-      except Exception as e:
-       last_err = str(e)
+    last_err = "API Key missing in Secrets"
+    for key in GEMINI_KEYS:
+      clean_key = key.strip()
+      if not clean_key:
+        continue
+      for m in models_list:
+        try:
+          u = f"https://googleapis.com{m}:generateContent?key={clean_key}"
+          r = requests.post(
+              u, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30
+          )
+          if r.status_code == 200:
+            t = r.json()["candidates"]["content"]["parts"]["text"]
+            if t:
+              return True, t
+          last_err = f"HTTP {r.status_code}: {r.text[:100]}"
+          time.sleep(2)
+        except Exception as e:
+          last_err = str(e)
     return False, f"⚠️ AI Error: {last_err}"
+
 
 
 if "generated_report" not in st.session_state:
