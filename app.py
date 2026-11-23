@@ -275,24 +275,26 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
       "4. 🔍 **Views పెరగడానికి Title, Description & Tags మార్పులు**\n"
       "5. 🚀 **రాబోయే 30 రోజుల్లో చేయాల్సిన 3 ముఖ్య పనులు (పని 1, పని 2, పని 3)**"
   )
-  models_list = ("gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash")
-  for attempt in range(2):
-    for key in GEMINI_KEYS:
-      client = genai.Client(api_key=key)
-      for model_name in models_list:
-        try:
-          resp = client.models.generate_content(
-              model=model_name, contents=prompt
-          )
-          if resp and resp.text:
-            return True, resp.text
-        except Exception:
-          time.sleep(1.5)
-          continue
-  return (
-      False,
-      "⚠️ AI సర్వర్ ప్రస్తుతం బిజీగా ఉంది. దయచేసి 5 సెకన్ల తర్వాత మళ్ళీ క్లిక్ చేయండి.",
-  )
+  models_list = ("gemini-2.5-flash", "gemini-2.5-flash-lite")
+       last_err = "API Key missing in Secrets"
+       for key in GEMINI_KEYS:
+         clean_key = key.strip()
+         if not clean_key:
+           continue
+         for m in models_list:
+           try:
+             u = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={clean_key}"
+             r = requests.post(
+                 u, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=25
+             )
+             if r.status_code == 200:
+               t = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+               if t:
+                 return True, t
+             last_err = f"HTTP {r.status_code}: {r.text[:100]}"
+           except Exception as e:
+             last_err = str(e)
+       return False, f"⚠️ AI Error: {last_err}"
 
 
 if "generated_report" not in st.session_state:
