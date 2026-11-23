@@ -40,9 +40,9 @@ GEMINI_KEYS = [k for k in raw_keys if k]
 YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY", "")
 RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "")
 
-GOOGLE_SHEET_API = "https://google.com"
-PAY_1_MONTH_LINK = "https://rzp.io"
-PAY_12_MONTHS_LINK = "https://rzp.io"
+GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbzEkkgxBP7aOKIXkEiOG7_rWc0quvnvTVqQDSWUAMk2zOPN7W8Ue_uOPwH7edmJJtEd/exec"
+PAY_1_MONTH_LINK = "https://rzp.io/rzp/yop8jYS"
+PAY_12_MONTHS_LINK = "https://rzp.io/rzp/sjonGmqw"
 
 # --- ఒక డివైజ్‌లో 3 Free Reports పూర్తయ్యాక Refresh చేసినా 0 చూపించే శాశ్వత లాక్ ---
 ls_free = streamlit_js_eval(
