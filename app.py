@@ -288,7 +288,8 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
     for m in ("gemini-2.5-flash", "gemini-2.5-flash-lite"):
       try:
         u = (
-            "https://googleapis.com"
+            "https://aiplatform." + "://googleapis.com"
+
             + m
             + ":generateContent?key="
             + clean_key
@@ -297,7 +298,7 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
             u, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30
         )
         if r.status_code == 200:
-          t = r.json()["candidates"]["content"]["parts"]["text"]
+          t = r.json()["candidates"][0]["content"]["parts"][0]["text"]
           if t:
             return True, t
         last_err = f"HTTP {r.status_code}: {r.text[:100]}"
