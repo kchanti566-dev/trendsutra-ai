@@ -275,7 +275,7 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
       "4. 🔍 **Views పెరగడానికి Title, Description & Tags మార్పులు**\n"
       "5. 🚀 **రాబోయే 30 రోజుల్లో చేయాల్సిన 3 ముఖ్య పనులు (పని 1, పని 2, పని 3)**"
   )
-      models_list = (
+  models_list = (
         "gemini-3.5-flash",
         "gemini-3.5-flash-lite",
         "gemini-2.5-pro",
