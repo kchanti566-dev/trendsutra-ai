@@ -151,7 +151,7 @@ with st.sidebar:
       elif res_status == "ALREADY_USED":
         st.error(
             "❌ ఈ Payment ID గరిష్టంగా 3 డివైజ్‌లలో వాడబడింది! ఫోన్ మార్చినట్లయితే"
-            " support@aiengtel.com కి మెసేజ్ చేయండి."
+            " admin@aiengtel.com కి మెసేజ్ చేయండి."
         )
       else:
         st.error("❌ సరైన Payment ID ఇవ్వండి.")
