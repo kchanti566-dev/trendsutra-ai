@@ -288,7 +288,7 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
     for m in ("gemini-2.5-flash", "gemini-2.5-flash-lite"):
       try:
         u = (
-            "https://aiplatform." + "://googleapis.com"
+            "https://aiplatform." + "https://googleapis.com"
 
             + m
             + ":generateContent?key="
