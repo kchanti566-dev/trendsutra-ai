@@ -292,7 +292,7 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
           if t:
             return True, t
         last_err = f"HTTP {r.status_code}: {r.text[:100]}"
-     except Exception as e:
+      except Exception as e:
        last_err = str(e)
  return False, f"⚠️ AI Error: {last_err}"
 
