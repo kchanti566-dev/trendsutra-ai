@@ -288,11 +288,11 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
     for m in models_list:
       try:
         u = (
-    "https://googleapis.com"
-    + m
-    + ":generateContent?key="
-    + clean_key
-)
+            "https://googleapis.com"
+            + m
+            + ":generateContent?key="
+            + clean_key
+    )
 
         r = requests.post(
             u, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30
