@@ -288,8 +288,7 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
     for m in ("gemini-2.5-flash", "gemini-2.5-flash-lite"):
       try:
         u = (
-            "https://generativelanguage." + "googleapis.com"
-            + "/v1beta/models/"
+            "https://aiplatform." + "googleapis.com"` + `"/v1/publishers/google/models/"
 
             + m
             + ":generateContent?key="
