@@ -289,8 +289,7 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
       try:
         u = (
             "https://googleapis.com"
-            + "/v1/publishers/google/models/"
-
+            + "/v1beta1/publishers/google/models/"
 
             + m
             + ":generateContent?key="
