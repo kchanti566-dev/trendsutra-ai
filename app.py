@@ -1,9 +1,9 @@
-import streamlit as st
 import os
 import re
 import time
 import hashlib
 import requests
+import streamlit as st
 from google import genai
 from googleapiclient.discovery import build
 from streamlit_js_eval import streamlit_js_eval
@@ -12,121 +12,113 @@ st.set_page_config(
     page_title="TrendSutra AI - Growth Analyzer",
     page_icon="logo.png" if os.path.isfile("logo.png") else "🚀",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# Ultra-compact Sidebar CSS (No Scroll needed) + Complete Badge Removal
-st.markdown("""
-<style>
-#MainMenu, footer, header[data-testid="stHeader"], .stDeployButton,
-div[data-testid="stToolbarActions"], div[data-testid="stDecoration"],
-div[data-testid="stStatusWidget"], [class^="viewerBadge_"],
-div[class*="viewerBadge"], a[href*="streamlit.io/cloud"] {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-}
-.block-container {
-    padding-top: 0.4rem !important;
-    padding-bottom: 0.5rem !important;
-    margin-top: -1.8rem !important;
-}
-section[data-testid="stSidebar"] > div:first-child {
-    padding-top: 0.2rem !important;
-    padding-bottom: 0.2rem !important;
-    margin-top: -1.8rem !important;
-}
-section[data-testid="stSidebar"] .stMarkdown h3 {
-    margin-top: 0.15rem !important;
-    margin-bottom: 0.15rem !important;
-    font-size: 1.02rem !important;
-}
-section[data-testid="stSidebar"] .stMarkdown p {
-    margin-bottom: 0.2rem !important;
-    font-size: 0.85rem !important;
-    line-height: 1.25 !important;
-}
-section[data-testid="stSidebar"] .stSelectbox,
-section[data-testid="stSidebar"] .stRadio,
-section[data-testid="stSidebar"] .stTextInput {
-    margin-bottom: -0.55rem !important;
-}
-section[data-testid="stSidebar"] div[data-testid="stAlert"] {
-    padding: 0.35rem 0.6rem !important;
-    margin-top: 0.2rem !important;
-    margin-bottom: 0.25rem !important;
-}
-div.stButton > button:first-child {
-    background-color: #c92a2a;
-    color: white;
-    font-weight: bold;
-    border-radius: 6px;
-    border: none;
-    padding: 0.35rem 0.75rem !important;
-}
-div.stDownloadButton > button:first-child {
-    background-color: #2b8a3e;
-    color: white;
-    font-weight: bold;
-    border-radius: 6px;
-    border: none;
-}
-</style>
-""", unsafe_allow_html=True)
+# Compact Sidebar CSS + Hide Bottom-Right Streamlit & Creator Badge
+st.markdown(
+    """
+    <style>
+    #MainMenu, footer, .stDeployButton, div[data-testid="stToolbarActions"],
+    div[data-testid="stStatusWidget"], div[data-testid="stDecoration"],
+    a[class*="viewerBadge"], div[class*="viewerBadge"],
+    #stDecoration, .viewerBadge_container__r5tak, .viewerBadge_link__qRIco {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+    header[data-testid="stHeader"] {
+        height: 1rem !important;
+        background: transparent !important;
+    }
+    .block-container {
+        padding-top: 0rem !important;
+        margin-top: -2rem !important;
+    }
+    section[data-testid="stSidebar"] > div:first-child {
+        padding-top: 0.4rem !important;
+        margin-top: -1rem !important;
+    }
+    section[data-testid="stSidebar"] .stMarkdown p {
+        margin-bottom: 0.25rem !important;
+        font-size: 0.88rem !important;
+    }
+    section[data-testid="stSidebar"] h3 {
+        font-size: 1.02rem !important;
+        margin-top: 0.2rem !important;
+        margin-bottom: 0.25rem !important;
+    }
+    section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
+        gap: 0.35rem !important;
+    }
+    div.stButton > button:first-child {
+        background-color: #c92a2a;
+        color: white;
+        font-weight: bold;
+        border-radius: 6px;
+        border: none;
+        padding: 0.35rem 0.75rem !important;
+    }
+    div.stDownloadButton > button:first-child {
+        background-color: #2b8a3e;
+        color: white;
+        font-weight: bold;
+        border-radius: 6px;
+        border: none;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-GEMINI_KEYS = [k for k in (st.secrets.get("GEMINI_API_KEY", ""), st.secrets.get("GEMINI_API_KEY_2", "")) if k]
-YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY", "")
-RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "")
+GEMINI_KEYS = [
+    k.strip()
+    for k in (
+        st.secrets.get("GEMINI_API_KEY", ""),
+        st.secrets.get("GEMINI_API_KEY_2", ""),
+    )
+    if k and k.strip()
+]
+YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY", "").strip()
+RAPIDAPI_KEY = st.secrets.get("RAPIDAPI_API_KEY", "").strip()
 
 GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbzEkkgxBP7aOKIXkEiOG7_rWc0quvnvTVqQDSWUAMk2zOPN7W8Ue_uOPwH7edmJJtEd/exec"
 PAY_1_MONTH_LINK = "https://rzp.io/rzp/yop8jYS"
 PAY_12_MONTHS_LINK = "https://rzp.io/rzp/sjonGmqw"
+
+# Hardware + Network Cross-Profile Device Signature
+hw_fp = streamlit_js_eval(
+    js_expressions="[navigator.platform, screen.width+'x'+screen.height, navigator.hardwareConcurrency, Intl.DateTimeFormat().resolvedOptions().timeZone].join('|')",
+    key="ts_hw_fp",
+)
+ls_free = streamlit_js_eval(
+    js_expressions="localStorage.getItem('ts_device_free_v6')", key="ls_get_free"
+)
+ls_pro = streamlit_js_eval(
+    js_expressions="localStorage.getItem('ts_device_pro_v6')", key="ls_get_pro"
+)
 
 @st.cache_resource
 def get_device_ledger():
     return {}
 
 device_ledger = get_device_ledger()
-
-def get_client_ip():
-    try:
-        hdrs = st.context.headers
-        fwd = hdrs.get("X-Forwarded-For", "") or hdrs.get("X-Real-Ip", "")
-        if fwd:
-            return fwd.split(",")[0].strip()
-    except Exception:
-        pass
-    return "unknown_ip"
-
-hw_sig = streamlit_js_eval(
-    js_expressions="[screen.width, screen.height, screen.colorDepth, navigator.hardwareConcurrency || 0, navigator.platform || '', Intl.DateTimeFormat().resolvedOptions().timeZone || ''].join('|')",
-    key="ts_hw_sig"
-)
-
-client_ip = get_client_ip()
-raw_fp = f"{client_ip}::{hw_sig or 'pending'}"
-device_hash = hashlib.sha256(raw_fp.encode()).hexdigest()[:24]
-
-ls_free = streamlit_js_eval(js_expressions="localStorage.getItem('ts_device_free_v5')", key="ls_get_free")
-ls_pro = streamlit_js_eval(js_expressions="localStorage.getItem('ts_device_pro_v5')", key="ls_get_pro")
+device_sig = hashlib.sha256(str(hw_fp or "default_hw").encode()).hexdigest()[:16]
 
 if "free_used_count" not in st.session_state:
     st.session_state.free_used_count = 0
 if "is_pro_user" not in st.session_state:
     st.session_state.is_pro_user = False
 
-# Sync across tabs, profiles, and browser refreshes
-server_used = device_ledger.get(device_hash, 0)
-browser_used = int(ls_free) if (ls_free and str(ls_free).isdigit()) else 0
-max_used = max(st.session_state.free_used_count, server_used, browser_used)
+server_used = device_ledger.get(device_sig, 0)
+local_used = int(ls_free) if (ls_free and str(ls_free).isdigit()) else 0
+max_used = max(st.session_state.free_used_count, server_used, local_used)
 
 if max_used > st.session_state.free_used_count:
     st.session_state.free_used_count = max_used
-    device_ledger[device_hash] = max_used
+    device_ledger[device_sig] = max_used
     st.rerun()
-elif st.session_state.free_used_count > server_used:
-    device_ledger[device_hash] = st.session_state.free_used_count
 
 if ls_pro == "yes" and not st.session_state.is_pro_user:
     st.session_state.is_pro_user = True
@@ -146,7 +138,7 @@ def verify_payment_id(pid):
             f"{GOOGLE_SHEET_API}?pid={clean_pid}",
             headers={"User-Agent": "Mozilla/5.0"},
             allow_redirects=True,
-            timeout=15
+            timeout=15,
         )
         txt = res.text.strip()
         if "ALREADY_USED" in txt:
@@ -162,33 +154,43 @@ if url_pid and not st.session_state.is_pro_user:
     st_val = verify_payment_id(url_pid)
     if st_val == "VALID":
         st.session_state.is_pro_user = True
-        streamlit_js_eval(js_expressions="localStorage.setItem('ts_device_pro_v5', 'yes')", key="ls_pro_url")
+        streamlit_js_eval(
+            js_expressions="localStorage.setItem('ts_device_pro_v6', 'yes')",
+            key="ls_pro_url",
+        )
     elif st_val == "ALREADY_USED":
         st.sidebar.error("⚠️ ఈ Payment ID గరిష్టంగా 3 డివైజ్‌లలో వాడబడింది!")
 
 with st.sidebar:
     st.markdown("### 🌍 Settings")
     report_lang = st.selectbox(
-        "Report Language / భాష:",
+        "Language / భాష:",
         ("English (Global)", "Telugu (తెలుగు)", "Tenglish"),
-        label_visibility="collapsed"
+        label_visibility="collapsed",
     )
     target_audience = st.radio(
         "Audience:",
-        ("Regional / Local", "Global", "Both"),
-        horizontal=True
+        ("Regional", "Global", "Both"),
+        horizontal=True,
     )
     st.markdown("### 💎 Pro Plans (Unlimited)")
     if st.session_state.is_pro_user:
         st.success("✅ **PRO UNLIMITED ACTIVE!** అన్‌లిమిటెడ్ రిపోర్ట్‌లు పొందవచ్చు.")
     else:
         rem = max(0, 3 - st.session_state.free_used_count)
-        if rem == 0:
-            st.error("🔒 **Free Trial: 0 ఉచిత రిపోర్ట్‌లు మిగిలి ఉన్నాయి!**")
+        if rem > 0:
+            st.info(f"🎁 **Free Trial: {rem} ఉచిత రిపోర్ట్‌లు** మిగిలి ఉన్నాయి.")
         else:
-            st.caption(f"🎁 **Free Trial:** మీకు **{rem} ఉచిత రిపోర్ట్‌లు** మిగిలి ఉన్నాయి.")
-        st.markdown(f"• **1 Month:** **₹100/-** 👉 [Pay ₹100]({PAY_1_MONTH_LINK})  \n• **12 Months:** **₹1,000/-** 👉 [Pay ₹1,000]({PAY_12_MONTHS_LINK})")
-        manual_pid = st.text_input("🔑 Payment ID:", placeholder="Enter Payment ID (pay_...)", label_visibility="collapsed")
+            st.error("🔒 **Free Trial: 0 ఉచిత రిపోర్ట్‌లు!** (3/3 పూర్తయ్యాయి)")
+        st.markdown(
+            f"• **1 Month: ₹100/-** 👉 [Pay ₹100]({PAY_1_MONTH_LINK})  \n"
+            f"• **12 Months: ₹1,000/-** 👉 [Pay ₹1,000]({PAY_12_MONTHS_LINK})"
+        )
+        manual_pid = st.text_input(
+            "Payment ID:",
+            placeholder="pay_P9x82kLm01",
+            label_visibility="collapsed",
+        )
         if st.button("Unlock with Payment ID 🔓", use_container_width=True):
             res_st = verify_payment_id(manual_pid)
             if res_st == "OWNER_VALID":
@@ -196,11 +198,14 @@ with st.sidebar:
                 st.rerun()
             elif res_st == "VALID":
                 st.session_state.is_pro_user = True
-                streamlit_js_eval(js_expressions="localStorage.setItem('ts_device_pro_v5', 'yes')", key=f"ls_pro_{int(time.time())}")
+                streamlit_js_eval(
+                    js_expressions="localStorage.setItem('ts_device_pro_v6', 'yes')",
+                    key=f"ls_pro_{int(time.time())}",
+                )
                 time.sleep(0.6)
                 st.rerun()
             elif res_st == "ALREADY_USED":
-                st.error("❌ ఈ Payment ID గరిష్టంగా 3 డివైజ్‌లలో వాడబడింది! admin@aiengtel.com కి మెసేజ్ చేయండి.")
+                st.error("❌ ఈ Payment ID 3 డివైజ్‌లలో వాడబడింది! admin@aiengtel.com కి రాయండి.")
             else:
                 st.error("❌ సరైన Payment ID ఇవ్వండి.")
 
@@ -210,15 +215,22 @@ if os.path.isfile("logo.png"):
         st.image("logo.png", width=95)
     with c2:
         st.markdown("# TrendSutra AI")
-        st.markdown("**A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powered by [AIENGTEL.com](https://aiengtel.com)**")
+        st.markdown(
+            "**A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powered by [AIENGTEL.com](https://aiengtel.com)**"
+        )
 else:
-    st.markdown("# 🚀 TrendSutra AI\n**A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powered by [AIENGTEL.com](https://aiengtel.com)**")
+    st.markdown(
+        "# 🚀 TrendSutra AI\n**A to Z Growth Analyzer for YouTube, Instagram & TikTok | Powered by [AIENGTEL.com](https://aiengtel.com)**"
+    )
 
 col1, col2 = st.columns(2)
 with col1:
     platform = st.selectbox("Select Platform:", ("YouTube", "Instagram Reels", "TikTok"))
 with col2:
-    video_url = st.text_input("Channel / Profile / Video Link:", placeholder="https://youtu.be/... లేదా Reel / TikTok లింక్ పేస్ట్ చేయండి")
+    video_url = st.text_input(
+        "Channel / Profile / Video Link:",
+        placeholder="https://youtu.be/... లేదా Reel / TikTok లింక్ పేస్ట్ చేయండి",
+    )
 
 def fetch_youtube_info(url):
     m = re.search(r"(?:v=|\/|live\/|shorts\/)([0-9A-Za-z_-]{11}).*", url)
@@ -233,48 +245,59 @@ def fetch_youtube_info(url):
         sn, st_obj = items[0]["snippet"], items[0]["statistics"]
         coms = []
         try:
-            cr = yt.commentThreads().list(part="snippet", videoId=m.group(1), maxResults=30, order="relevance", textFormat="plainText").execute()
-            coms = [c["snippet"]["topLevelComment"]["snippet"]["textDisplay"] for c in cr.get("items", ())]
+            cr = (
+                yt.commentThreads()
+                .list(
+                    part="snippet",
+                    videoId=m.group(1),
+                    maxResults=30,
+                    order="relevance",
+                    textFormat="plainText",
+                )
+                .execute()
+            )
+            coms = [
+                c["snippet"]["topLevelComment"]["snippet"]["textDisplay"]
+                for c in cr.get("items", ())
+            ]
         except Exception:
             coms = ["కామెంట్లు ఆఫ్ చేసి ఉన్నాయి."]
-        return f"Title: {sn.get('title')}\nViews: {st_obj.get('viewCount','0')}, Likes: {st_obj.get('likeCount','0')}\nDesc: {sn.get('description','')[:600]}\nTags: {sn.get('tags',())}\nComments: {coms}", st_obj
+        return (
+            f"Title: {sn.get('title')}\nViews: {st_obj.get('viewCount','0')}, Likes: {st_obj.get('likeCount','0')}\n"
+            f"Desc: {sn.get('description','')[:600]}\nTags: {sn.get('tags',())}\nComments: {coms}",
+            st_obj,
+        )
     except Exception as e:
         return None, f"YouTube Error: {str(e)}"
 
 def generate_growth_report(platform_name, raw_data, lang, audience):
     prompt = (
         f"Friendly {platform_name} Growth Advisor for TrendSutra AI. Give a 5-section A-to-Z Growth Report in {lang} for {audience}. "
-        f"Use exact Telugu spelling 'పని 1, పని 2, పని 3'.\n"
-        f"Sections: 1. Audience Feedback 2. 3 Viral Video Ideas 3. Earning Ideas 4. Title/Description/Tags SEO 5. 30-Day Action Plan.\n"
+        "Use exact Telugu spelling 'పని 1, పని 2, పని 3'.\n"
+        "Sections: 1. Audience Feedback 2. 3 Viral Video Ideas 3. Earning Ideas 4. Title/Description/Tags SEO 5. 30-Day Action Plan.\n"
         f"Data: {raw_data}"
     )
     last_err = "API Key missing in Secrets"
     for key in GEMINI_KEYS:
-        clean_key = key.strip()
-        if not clean_key:
-            continue
-        client = genai.Client(api_key=clean_key)
-        detected_models = []
+        client = genai.Client(api_key=key)
         try:
-            for mod in client.models.list():
-                m_name = getattr(mod, "name", "").replace("models/", "")
-                if "flash" in m_name and "pro" not in m_name and "embedding" not in m_name and "vision" not in m_name:
-                    detected_models.append(m_name)
+            avail = [
+                m.name.replace("models/", "")
+                for m in client.models.list()
+                if "flash" in m.name.lower()
+                and "generateContent" in getattr(m, "supported_actions", ["generateContent"])
+            ]
         except Exception:
-            pass
-        if not detected_models:
-            detected_models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.5-flash-lite"]
-        for m in detected_models[:4]:
-            for attempt in range(2):
-                try:
-                    resp = client.models.generate_content(model=m, contents=prompt)
-                    if resp and resp.text:
-                        return True, resp.text
-                except Exception as e:
-                    last_err = str(e)
-                    if "429" in last_err or "404" in last_err:
-                        break
-                    time.sleep(1.5)
+            avail = []
+        candidates = avail or ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
+        for m_name in candidates:
+            try:
+                resp = client.models.generate_content(model=m_name, contents=prompt)
+                if resp and resp.text:
+                    return True, resp.text
+            except Exception as e:
+                last_err = str(e)
+                time.sleep(1)
     return False, f"⚠️ AI సర్వర్ బిజీగా ఉంది: {last_err[:120]}"
 
 if "generated_report" not in st.session_state:
@@ -286,7 +309,10 @@ if st.button("Generate Accurate Growth Report 🔍"):
     if not st.session_state.is_pro_user and st.session_state.free_used_count >= 3:
         st.session_state.generated_report = ""
         st.error("🔒 **ఈ డివైజ్‌లో మీ 3 ఉచిత రిపోర్ట్‌లు పూర్తయ్యాయి! (0 Chances Left)**")
-        st.markdown(f"* **1 Month Unlimited (₹100):** 👉 [Pay ₹100]({PAY_1_MONTH_LINK})\n* **12 Months Unlimited (₹1,000):** 👉 [Pay ₹1,000]({PAY_12_MONTHS_LINK})")
+        st.markdown(
+            f"* **1 Month Unlimited (₹100):** 👉 [Pay ₹100]({PAY_1_MONTH_LINK})\n"
+            f"* **12 Months Unlimited (₹1,000):** 👉 [Pay ₹1,000]({PAY_12_MONTHS_LINK})"
+        )
     elif not video_url.strip():
         st.warning("⚠️ ముందుగా వీడియో లింక్ పేస్ట్ చేయండి.")
     else:
@@ -302,11 +328,12 @@ if st.button("Generate Accurate Growth Report 🔍"):
                 if ok:
                     st.session_state.generated_report, st.session_state.report_stats = res_txt, st_obj
                     if not st.session_state.is_pro_user:
-                        st.session_state.free_used_count += 1
-                        device_ledger[device_hash] = st.session_state.free_used_count
+                        new_cnt = st.session_state.free_used_count + 1
+                        st.session_state.free_used_count = new_cnt
+                        device_ledger[device_sig] = new_cnt
                         streamlit_js_eval(
-                            js_expressions=f"localStorage.setItem('ts_device_free_v5', '{st.session_state.free_used_count}')",
-                            key=f"ls_f_{int(time.time())}"
+                            js_expressions=f"localStorage.setItem('ts_device_free_v6', '{new_cnt}')",
+                            key=f"ls_f_{int(time.time())}",
                         )
                         time.sleep(0.6)
                         st.rerun()
@@ -320,5 +347,9 @@ if st.session_state.generated_report:
         m2.metric("👍 Likes", f"{int(st.session_state.report_stats.get('likeCount',0)):,}")
         m3.metric("💬 Comments", f"{int(st.session_state.report_stats.get('commentCount',0)):,}")
     st.success("✅ Growth Audit Report సిద్ధమైంది!")
-    st.download_button("📥 Download Growth Report (.txt)", st.session_state.generated_report, "TrendSutra_Report.txt")
+    st.download_button(
+        "📥 Download Growth Report (.txt)",
+        st.session_state.generated_report,
+        "TrendSutra_Report.txt",
+    )
     st.markdown(st.session_state.generated_report)
