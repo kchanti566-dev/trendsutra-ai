@@ -218,7 +218,12 @@ def generate_growth_report(platform_name, raw_data, lang, audience):
     if not key.strip():
       continue
     client = genai.Client(api_key=key.strip())
-    for m in ("gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"):
+  for m in (
+      "gemini-2.5-flash",
+      "gemini-3.5-flash-lite",
+      "gemini-3.8-flash",
+  ):
+
       try:
         resp = client.models.generate_content(model=m, contents=prompt)
         if resp and resp.text:
