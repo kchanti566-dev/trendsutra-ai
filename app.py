@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 from google import genai
 from google.genai import types
@@ -9,7 +10,11 @@ import smtplib
 from email.mime.text import MIMEText
 
 # --- 1. PAGE CONFIG ---
-st.set_page_config(page_title="TrendSutra AI - Growth Analyzer", page_icon="🚀", layout="wide")
+st.set_page_config(
+    page_title="TrendSutra AI - Growth Analyzer",
+    page_icon="logo.png" if os.path.exists("logo.png") else "🚀",
+    layout="wide"
+)
 
 # --- 2. LOAD SECRETS ---
 GEMINI_KEY = str(st.secrets.get("GEMINI_API_KEY", "")).strip()
@@ -28,26 +33,58 @@ TEMP_DOMAINS = {
     "getnada.com", "temp-mail.org", "dispostable.com", "maildrop.cc"
 }
 
-# --- 3. CUSTOM STYLING ---
+# --- 3. CLEAN UI & HIDE TOP-RIGHT STREAMLIT TOOLBAR/SYMBOLS ---
 st.markdown("""
 <style>
+    /* Hide Top Right Share, Star, Edit, GitHub, Menu & Footer */
+    [data-testid="stToolbar"],
+    [data-testid="stHeaderActionElements"],
+    [data-testid="stDecoration"],
+    #MainMenu,
+    footer,
+    header [data-testid="baseButton-headerNoPadding"] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    .block-container {
+        padding-top: 1.2rem !important;
+        padding-bottom: 1.5rem !important;
+    }
     .main-header {
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-        padding: 20px 26px;
+        padding: 18px 24px;
         border-radius: 14px;
         border-left: 6px solid #10b981;
-        margin-bottom: 18px;
-        color: white;
+        margin-bottom: 14px;
+        color: #ffffff;
     }
-    .main-header h1 { margin: 0; font-size: 2rem; color: #ffffff; }
-    .main-header p { margin: 6px 0 0 0; color: #cbd5e1; font-size: 1rem; }
-    .login-card {
-        background: #f8fafc;
-        border: 2px solid #cbd5e1;
-        border-radius: 14px;
-        padding: 24px;
-        max-width: 540px;
-        margin: 15px auto;
+    .main-header h1 {
+        margin: 0;
+        font-size: 1.9rem;
+        color: #ffffff !important;
+    }
+    .main-header p {
+        margin: 5px 0 0 0;
+        color: #cbd5e1 !important;
+        font-size: 0.98rem;
+    }
+    .compact-login-box {
+        background: #1e293b;
+        border: 1.5px solid #334155;
+        border-radius: 12px;
+        padding: 14px 18px;
+        margin-bottom: 14px;
+        color: #f8fafc !important;
+    }
+    .compact-login-box h4 {
+        margin: 0 0 4px 0;
+        color: #10b981 !important;
+        font-size: 1.05rem;
+    }
+    .compact-login-box p {
+        margin: 0;
+        color: #e2e8f0 !important;
+        font-size: 0.9rem;
     }
     .loading-pill {
         background: #ecfdf5;
@@ -77,7 +114,7 @@ if "pro_label" not in st.session_state:
 if "last_report" not in st.session_state:
     st.session_state.last_report = ""
 
-# --- 5. CHECK GOOGLE OAUTH LOGIN ---
+# --- 5. AUTO-DETECT GOOGLE OAUTH & RAZORPAY REDIRECT CALLBACK ---
 try:
     if hasattr(st, "user") and getattr(st.user, "is_logged_in", False):
         g_email = getattr(st.user, "email", "")
@@ -136,6 +173,17 @@ def verify_payment_id(pid, plan="1m"):
     except Exception:
         pass
     return "ERROR"
+
+# Auto-activate Pro if Razorpay redirects back with ?razorpay_payment_id=pay_... or ?pid=pay_...
+qp = st.query_params
+auto_pid = qp.get("razorpay_payment_id", "") or qp.get("payment_id", "") or qp.get("pid", "")
+if auto_pid and not st.session_state.pro_unlocked:
+    auto_plan = qp.get("plan", "1m")
+    st_res = verify_payment_id(auto_pid, plan=auto_plan)
+    if st_res in ["VALID", "OWNER"]:
+        st.session_state.pro_unlocked = True
+        st.session_state.pro_label = "PRO UNLIMITED ACTIVE"
+        st.query_params.clear()
 
 def send_otp_email(to_email, code):
     if not SENDER_EMAIL or not SENDER_PASS:
@@ -266,16 +314,13 @@ def generate_report_stream(prompt):
             continue
     raise RuntimeError(f"AI సర్వర్ రద్దీగా ఉంది. దయచేసి 5 సెకన్ల తర్వాత మళ్ళీ ప్రయత్నించండి. ({last_err})")
 
-# --- 9. HEADER ---
-st.markdown("""
-<div class="main-header">
-    <h1>🚀 TrendSutra AI</h1>
-    <p>A to Z Growth Analyzer for YouTube, Instagram & TikTok Creators</p>
-</div>
-""", unsafe_allow_html=True)
-
-# --- 10. SIDEBAR ---
+# --- 9. SIDEBAR (RESTORED CLASSIC INTERFACE + LOGO) ---
 with st.sidebar:
+    if os.path.exists("logo.png"):
+        st.image("logo.png", width=110)
+    elif os.path.exists("logo.jpg"):
+        st.image("logo.jpg", width=110)
+
     st.header("⚙️ Settings")
     report_lang = st.selectbox(
         "Report Language / భాష:",
@@ -339,64 +384,95 @@ with st.sidebar:
                 st.error("❌ చెల్లని Payment ID (`pay_...` తో మొదలవ్వాలి).")
 
     st.divider()
-    st.caption("📩 Support: admin@aiengtel.com")
+    st.caption("📩 Support: support@aiengtel.com")
     st.caption("© 2026 TrendSutra AI | aiengtel.com")
 
-# --- 11. LOGIN GATE (IF NOT LOGGED IN & NOT PRO) ---
-if not st.session_state.verified_email and not st.session_state.pro_unlocked:
+# --- 10. MAIN HEADER WITH LOGO ---
+h_col1, h_col2 = st.columns([1, 9]) if (os.path.exists("logo.png") or os.path.exists("logo.jpg")) else (None, None)
+if h_col1 is not None:
+    with h_col1:
+        st.image("logo.png" if os.path.exists("logo.png") else "logo.jpg", width=82)
+    with h_col2:
+        st.markdown("""
+        <div class="main-header">
+            <h1>🚀 TrendSutra AI</h1>
+            <p>A to Z Growth Analyzer for YouTube, Instagram & TikTok Creators</p>
+        </div>
+        """, unsafe_allow_html=True)
+else:
     st.markdown("""
-    <div class="login-card">
-        <h3 style="margin-top:0;">🔐 ఉచిత గ్రోత్ రిపోర్ట్ కోసం లాగిన్ అవ్వండి</h3>
-        <p style="color:#475569; margin-bottom:0;">
-            మీ <b>3 ఉచిత రిపోర్ట్‌లు</b> పొందడానికి ఒక్క క్లిక్‌తో Google ద్వారా లేదా మీ Email OTP ద్వారా లాగిన్ అవ్వండి:
-        </p>
+    <div class="main-header">
+        <h1>🚀 TrendSutra AI</h1>
+        <p>A to Z Growth Analyzer for YouTube, Instagram & TikTok Creators</p>
     </div>
     """, unsafe_allow_html=True)
 
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        if st.button("🔵 Continue with Google (1-Click Login)", type="primary", use_container_width=True):
+# --- 11. SINGLE-PAGE COMPACT LOGIN BAR (NO SCROLLING NEEDED) ---
+if not st.session_state.verified_email and not st.session_state.pro_unlocked:
+    st.markdown("""
+    <div class="compact-login-box">
+        <h4>🔐 3 ఉచిత రిపోర్ట్‌లు పొందడానికి 1-క్లిక్ లాగిన్ అవ్వండి</h4>
+        <p>Google ద్వారా ఒక్క క్లిక్‌తో లేదా మీ Email OTP ద్వారా లాగిన్ అయి వెంటనే విశ్లేషణ ప్రారంభించండి:</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    lc1, lc2, lc3 = st.columns([2.2, 2.5, 1.5])
+    with lc1:
+        st.write("")
+        if st.button("🔵 Continue with Google (1-Click)", type="primary", use_container_width=True):
             try:
                 st.login("google")
             except Exception as e:
-                st.error(f"Google Login సిద్ధంగా లేదు: {e}")
-
-        st.markdown("<p style='text-align:center; color:#64748b; margin:12px 0;'>— లేదా మీ Email OTP ద్వారా లాగిన్ అవ్వండి —</p>", unsafe_allow_html=True)
-
-        email_in = st.text_input("మీ Email ID ఎంటర్ చేయండి:", placeholder="creator@gmail.com")
-        if st.button("Send Verification OTP 📩", use_container_width=True):
+                st.error(f"Google Login Error: {e}")
+    with lc2:
+        email_in = st.text_input("లేదా Email OTP:", placeholder="creator@gmail.com", label_visibility="collapsed")
+    with lc3:
+        if st.button("Send OTP 📩", use_container_width=True):
             clean_em = email_in.strip().lower()
             if "@" not in clean_em or "." not in clean_em.split("@")[-1]:
-                st.error("❌ సరైన Email ID ఎంటర్ చేయండి.")
+                st.error("సరైన Email ఇవ్వండి")
             elif clean_em.split("@")[-1] in TEMP_DOMAINS:
-                st.error("❌ తాత్కాలిక (Temp) ఈమెయిల్ అనుమతించబడదు.")
+                st.error("Temp Email అనుమతించబడదు")
             else:
                 code = str(random.randint(100000, 999999))
                 ok, err_msg = send_otp_email(clean_em, code)
                 if ok:
                     st.session_state.otp_code = code
                     st.session_state.otp_target = clean_em
-                    st.success(f"✅ {clean_em} కి 6-అంకెల OTP పంపబడింది! ఇన్‌బాక్స్ / Spam చెక్ చేయండి.")
+                    st.success(f"✅ {clean_em} కి OTP పంపబడింది!")
                 else:
-                    st.error(f"OTP పంపడంలో సమస్య: {err_msg}")
+                    st.error(f"OTP Error: {err_msg}")
 
-        if st.session_state.otp_target:
-            otp_in = st.text_input("మీ Email కి వచ్చిన 6-అంకెల OTP ఎంటర్ చేయండి:", max_chars=6)
+    if st.session_state.otp_target:
+        oc1, oc2 = st.columns([3, 1.5])
+        with oc1:
+            otp_in = st.text_input("మీ Email కి వచ్చిన 6-అంకెల OTP ఎంటర్ చేయండి:", max_chars=6, label_visibility="collapsed", placeholder="6-అంకెల OTP ఎంటర్ చేయండి")
+        with oc2:
             if st.button("Verify OTP & Start ✅", type="primary", use_container_width=True):
                 if otp_in.strip() == st.session_state.otp_code:
                     st.session_state.verified_email = st.session_state.otp_target
                     st.session_state.otp_code = ""
                     st.rerun()
                 else:
-                    st.error("❌ తప్పు OTP! దయచేసి మళ్ళీ చెక్ చేయండి.")
-    st.stop()
+                    st.error("❌ తప్పు OTP!")
 
-# --- 12. MAIN WORKSPACE ---
+# --- 12. MAIN WORKSPACE (ALWAYS VISIBLE ON THE SAME PAGE!) ---
 tab_yt, tab_ig, tab_tt = st.tabs(["📺 YouTube Analyzer", "📸 Instagram Reels Analyzer", "🎵 TikTok Analyzer"])
+
+def can_run_report():
+    if st.session_state.pro_unlocked:
+        return True
+    if not st.session_state.verified_email:
+        st.warning("👆 ముందుగా పైన ఉన్న **Continue with Google** లేదా **Email OTP** ద్వారా లాగిన్ అవ్వండి (3 ఉచిత రిపోర్ట్‌లు వస్తాయి)!")
+        return False
+    if free_left <= 0:
+        st.error("🔒 మీ 3 ఉచిత రిపోర్ట్‌లు పూర్తయ్యాయి! అన్‌లిమిటెడ్ రిపోర్ట్‌ల కోసం ఎడమ వైపు Pro Plan తీసుకోండి.")
+        return False
+    return True
 
 with tab_yt:
     yt_url = st.text_input("Paste YouTube Video or Shorts Link:", placeholder="https://www.youtube.com/watch?v=...")
-    b_col1, b_col2 = st.columns([1.3, 1.7])
+    b_col1, b_col2 = st.columns([1.4, 2.6])
     with b_col1:
         run_yt = st.button("Generate Accurate Growth Report 🔍", key="btn_yt", type="primary", use_container_width=True)
     with b_col2:
@@ -405,9 +481,7 @@ with tab_yt:
     if run_yt:
         if not yt_url.strip():
             st.warning("దయచేసి YouTube లింక్ పేస్ట్ చేయండి.")
-        elif not st.session_state.pro_unlocked and free_left <= 0:
-            st.error("🔒 మీ 3 ఉచిత రిపోర్ట్‌లు పూర్తయ్యాయి! అన్‌లిమిటెడ్ రిపోర్ట్‌ల కోసం ఎడమ వైపు Pro Plan తీసుకోండి.")
-        else:
+        elif can_run_report():
             vid_id = extract_youtube_id(yt_url.strip())
             if not vid_id:
                 st.error("❌ సరైన YouTube వీడియో లేదా Shorts లింక్ ఇవ్వండి.")
@@ -484,7 +558,7 @@ STRICTLY FOLLOW THIS 6-SECTION STRUCTURE:
 
 with tab_ig:
     ig_url = st.text_input("Paste Instagram Reel Link:", placeholder="https://www.instagram.com/reel/...")
-    ib1, ib2 = st.columns([1.3, 1.7])
+    ib1, ib2 = st.columns([1.4, 2.6])
     with ib1:
         run_ig = st.button("Generate Instagram Growth Report 🔍", key="btn_ig", type="primary", use_container_width=True)
     with ib2:
@@ -493,9 +567,7 @@ with tab_ig:
     if run_ig:
         if not ig_url.strip():
             st.warning("దయచేసి Instagram Reel లింక్ పేస్ట్ చేయండి.")
-        elif not st.session_state.pro_unlocked and free_left <= 0:
-            st.error("🔒 మీ 3 ఉచిత రిపోర్ట్‌లు పూర్తయ్యాయి! అన్‌లిమిటెడ్ రిపోర్ట్‌ల కోసం ఎడమ వైపు Pro Plan తీసుకోండి.")
-        else:
+        elif can_run_report():
             ig_status_slot.markdown('<div class="loading-pill">⚡ Instagram రిపోర్ట్ తయారవుతోంది... ⏳</div>', unsafe_allow_html=True)
             ig_prompt = f"""
 You are a warm, encouraging human Instagram Reels growth advisor ("సలహాదారు").
@@ -533,7 +605,7 @@ Include:
 
 with tab_tt:
     tt_url = st.text_input("Paste TikTok Video Link:", placeholder="https://www.tiktok.com/@user/video/...")
-    tb1, tb2 = st.columns([1.3, 1.7])
+    tb1, tb2 = st.columns([1.4, 2.6])
     with tb1:
         run_tt = st.button("Generate TikTok Growth Report 🔍", key="btn_tt", type="primary", use_container_width=True)
     with tb2:
@@ -542,9 +614,7 @@ with tab_tt:
     if run_tt:
         if not tt_url.strip():
             st.warning("దయచేసి TikTok లింక్ పేస్ట్ చేయండి.")
-        elif not st.session_state.pro_unlocked and free_left <= 0:
-            st.error("🔒 మీ 3 ఉచిత రిపోర్ట్‌లు పూర్తయ్యాయి! అన్‌లిమిటెడ్ రిపోర్ట్‌ల కోసం ఎడమ వైపు Pro Plan తీసుకోండి.")
-        else:
+        elif can_run_report():
             tt_status_slot.markdown('<div class="loading-pill">⚡ TikTok రిపోర్ట్ తయారవుతోంది... ⏳</div>', unsafe_allow_html=True)
             tt_prompt = f"""
 You are a warm, encouraging human TikTok growth advisor ("సలహాదారు").
