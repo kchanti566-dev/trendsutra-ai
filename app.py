@@ -23,8 +23,8 @@ OWNER_CODE = str(st.secrets.get("OWNER_SECRET_CODE", "")).strip()
 SENDER_EMAIL = str(st.secrets.get("SENDER_EMAIL", "")).strip()
 SENDER_PASS = str(st.secrets.get("SENDER_APP_PASSWORD", "")).strip().replace(" ", "")
 
-RAZORPAY_1M = "https://rzp.io/rzp/70Y3L0K"
-RAZORPAY_12M = "https://rzp.io/rzp/77zX68U"
+RAZORPAY_1M = "https://rzp.io/rzp/yop8jYS"
+RAZORPAY_12M = "https://rzp.io/rzp/sjonGmqw"
 
 TEMP_DOMAINS = {
     "mailinator.com", "tempmail.com", "10minutemail.com", "guerrillamail.com",
