@@ -424,7 +424,7 @@ st.markdown("""
     header[data-testid="stHeader"] { background: transparent !important; }
     [data-testid="stSidebarCollapsedControl"] { display: flex !important; visibility: visible !important; z-index: 99999 !important; }
 
-    .block-container { padding-top: 2.3rem !important; padding-bottom: 1rem !important; max-width: 1180px; }
+    .block-container { padding-top: 2.3rem !important; padding-bottom: 0.8rem !important; max-width: 1220px; }
     section[data-testid="stSidebar"] .block-container { padding-top: 0.6rem !important; padding-bottom: 0.4rem !important; }
     section[data-testid="stSidebar"] hr { margin: 0.45rem 0 !important; }
     section[data-testid="stSidebar"] .stMarkdown p { margin-bottom: 0.25rem !important; font-size: 0.88rem !important; }
@@ -433,7 +433,7 @@ st.markdown("""
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
         padding: 12px 18px;
         border-radius: 12px;
-        border-bottom: 4px solid #10b981;
+        border: 2px solid #10b981;
         margin-bottom: 10px;
         text-align: center;
         color: #ffffff;
@@ -472,7 +472,8 @@ for key, default in [
     ("yt_vid_id", ""),
     ("yt_detected_lang", ""),
     ("ig_report", ""),
-    ("tt_report", "")
+    ("tt_report", ""),
+    ("exhausted_keys", set())
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -634,15 +635,17 @@ def fetch_youtube_details(video_id):
     except Exception:
         return None
 
-# --- 11. SINGLE-CALL UNIFIED GEMINI AI WITH 4-KEY SMART FAILOVER ---
-def get_best_models(client):
+# --- 11. SINGLE-CALL UNIFIED GEMINI AI WITH 4-KEY SMART SESSION MEMORY ---
+@st.cache_data(ttl=1800, show_spinner=False)
+def get_best_models_cached(api_key):
     preferred = [
-        "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
-        "gemini-3.5-flash",
-        "gemini-3.5-flash-lite"
+        "gemini-2.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.5-flash"
     ]
     try:
+        client = genai.Client(api_key=api_key)
         avail = []
         for m in client.models.list():
             name = m.name.replace("models/", "")
@@ -653,10 +656,10 @@ def get_best_models(client):
             if a not in ordered:
                 ordered.append(a)
         if ordered:
-            return ordered[:3]
+            return ordered[:2]
     except Exception:
         pass
-    return preferred
+    return ["gemini-2.5-flash-lite", "gemini-2.5-flash"]
 
 def clean_mentor_word(text):
     return text.replace("మెంటర్", "సలహాదారు").replace("స్ట్రాటజిస్ట్", "సలహాదారు")
@@ -664,11 +667,16 @@ def clean_mentor_word(text):
 def generate_report_stream(prompt):
     if not GEMINI_KEYS:
         raise RuntimeError("API Key missing in Secrets.")
+    active_keys = [k for k in GEMINI_KEYS if k not in st.session_state.exhausted_keys]
+    if not active_keys:
+        st.session_state.exhausted_keys = set()
+        active_keys = GEMINI_KEYS
+
     last_err = ""
-    for api_key in GEMINI_KEYS:
+    for idx, api_key in enumerate(active_keys):
         try:
             client = genai.Client(api_key=api_key)
-            models = get_best_models(client)
+            models = get_best_models_cached(api_key)
             for model_name in models:
                 try:
                     response = client.models.generate_content_stream(
@@ -685,6 +693,10 @@ def generate_report_stream(prompt):
                         return
                 except Exception as me:
                     last_err = str(me)
+                    if "429" in last_err or "quota" in last_err.lower() or "resource_exhausted" in last_err.lower():
+                        if idx < len(active_keys) - 1:
+                            st.session_state.exhausted_keys.add(api_key)
+                        break
                     continue
         except Exception as ke:
             last_err = str(ke)
@@ -758,7 +770,7 @@ st.markdown(f"""
         <h1>TrendSutra AI</h1>
     </div>
     <p class="banner-sub">A to Z Growth Analyzer for YouTube, Instagram & TikTok Creators</p>
-    <span class="india-badge">🇮🇳 1 AI • 1 India — Supports All 22 Indian Official Languages + Bhojpuri</span>
+    <span class="india-badge">1 AI • 1 India — Supports All 22 Indian Official Languages + Bhojpuri</span>
 </div>
 """, unsafe_allow_html=True)
 
