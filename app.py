@@ -473,7 +473,8 @@ for key, default in [
     ("yt_detected_lang", ""),
     ("ig_report", ""),
     ("tt_report", ""),
-    ("exhausted_keys", set())
+    ("exhausted_keys", []),
+    ("cached_models", {})
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -635,31 +636,29 @@ def fetch_youtube_details(video_id):
     except Exception:
         return None
 
-# --- 11. SINGLE-CALL UNIFIED GEMINI AI WITH 4-KEY SMART SESSION MEMORY ---
-@st.cache_data(ttl=1800, show_spinner=False)
-def get_best_models_cached(api_key):
-    preferred = [
-        "gemini-2.5-flash-lite",
-        "gemini-2.5-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-3.5-flash"
-    ]
+# --- 11. SINGLE-CALL UNIFIED GEMINI AI WITH 4-KEY SMART FAILOVER + AUTO MODEL DISCOVERY ---
+def get_best_models(client, api_key):
+    key_tag = api_key[-6:]
+    if key_tag in st.session_state.cached_models:
+        return st.session_state.cached_models[key_tag]
     try:
-        client = genai.Client(api_key=api_key)
         avail = []
         for m in client.models.list():
             name = m.name.replace("models/", "")
-            if "flash" in name and "2.0" not in name and "1.5" not in name and "8b" not in name:
+            methods = getattr(m, "supported_generation_methods", []) or []
+            if "generateContent" in methods and ("gemini-3" in name or "gemini-2" in name) and "image" not in name and "tts" not in name and "audio" not in name and "embedding" not in name:
                 avail.append(name)
-        ordered = [p for p in preferred if p in avail]
-        for a in avail:
-            if a not in ordered:
-                ordered.append(a)
+        # Prefer fastest flash-lite and flash models dynamically discovered from account
+        lite_models = [m for m in avail if "flash-lite" in m]
+        flash_models = [m for m in avail if "flash" in m and "lite" not in m]
+        other_models = [m for m in avail if m not in lite_models and m not in flash_models]
+        ordered = (lite_models[:2] + flash_models[:2] + other_models[:1])
         if ordered:
-            return ordered[:2]
+            st.session_state.cached_models[key_tag] = ordered
+            return ordered
     except Exception:
         pass
-    return ["gemini-2.5-flash-lite", "gemini-2.5-flash"]
+    return ["gemini-3.8-flash-lite", "gemini-3.8-flash", "gemini-2.5-flash"]
 
 def clean_mentor_word(text):
     return text.replace("మెంటర్", "సలహాదారు").replace("స్ట్రాటజిస్ట్", "సలహాదారు")
@@ -669,14 +668,13 @@ def generate_report_stream(prompt):
         raise RuntimeError("API Key missing in Secrets.")
     active_keys = [k for k in GEMINI_KEYS if k not in st.session_state.exhausted_keys]
     if not active_keys:
-        st.session_state.exhausted_keys = set()
+        st.session_state.exhausted_keys = []
         active_keys = GEMINI_KEYS
-
     last_err = ""
-    for idx, api_key in enumerate(active_keys):
+    for api_key in active_keys:
         try:
             client = genai.Client(api_key=api_key)
-            models = get_best_models_cached(api_key)
+            models = get_best_models(client, api_key)
             for model_name in models:
                 try:
                     response = client.models.generate_content_stream(
@@ -693,9 +691,9 @@ def generate_report_stream(prompt):
                         return
                 except Exception as me:
                     last_err = str(me)
-                    if "429" in last_err or "quota" in last_err.lower() or "resource_exhausted" in last_err.lower():
-                        if idx < len(active_keys) - 1:
-                            st.session_state.exhausted_keys.add(api_key)
+                    if "429" in last_err or "RESOURCE_EXHAUSTED" in last_err or "quota" in last_err.lower():
+                        if api_key not in st.session_state.exhausted_keys:
+                            st.session_state.exhausted_keys.append(api_key)
                         break
                     continue
         except Exception as ke:
