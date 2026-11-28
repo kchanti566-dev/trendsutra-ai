@@ -424,7 +424,7 @@ st.markdown("""
     header[data-testid="stHeader"] { background: transparent !important; }
     [data-testid="stSidebarCollapsedControl"] { display: flex !important; visibility: visible !important; z-index: 99999 !important; }
 
-    .block-container { padding-top: 0.7rem !important; padding-bottom: 0.8rem !important; max-width: 1220px; }
+    .block-container { padding-top: 2.3rem !important; padding-bottom: 1rem !important; max-width: 1180px; }
     section[data-testid="stSidebar"] .block-container { padding-top: 0.6rem !important; padding-bottom: 0.4rem !important; }
     section[data-testid="stSidebar"] hr { margin: 0.45rem 0 !important; }
     section[data-testid="stSidebar"] .stMarkdown p { margin-bottom: 0.25rem !important; font-size: 0.88rem !important; }
