@@ -12,16 +12,21 @@ import os
 from email.mime.text import MIMEText
 
 # --- 1. PAGE CONFIG ---
-PAGE_ICON = "logo.png" if os.path.exists("logo.png") else "🇮🇳"
-st.set_page_config(page_title="TrendSutra AI - 1 AI • 1 India", page_icon=PAGE_ICON, layout="wide")
+st.set_page_config(
+    page_title="TrendSutra AI - 1 AI • 1 India",
+    page_icon="logo.png" if os.path.exists("logo.png") else "📈",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# --- 2. LOAD SECRETS (4-KEY SMART FAILOVER: FREE KEYS FIRST -> PAID KEY LAST) ---
-KEY_1_PAID = str(st.secrets.get("GEMINI_API_KEY", "")).strip()
-KEY_2_FREE = str(st.secrets.get("GEMINI_API_KEY_2", "")).strip()
-KEY_3_FREE = str(st.secrets.get("GEMINI_API_KEY_3", "")).strip()
-KEY_4_FREE = str(st.secrets.get("GEMINI_API_KEY_4", "")).strip()
-
-GEMINI_KEYS = [k for k in [KEY_4_FREE, KEY_3_FREE, KEY_2_FREE, KEY_1_PAID] if k]
+# --- 2. LOAD SECRETS (4-KEY SMART FAILOVER) ---
+GEMINI_KEYS = [
+    str(st.secrets.get("GEMINI_API_KEY_4", "")).strip(),
+    str(st.secrets.get("GEMINI_API_KEY_3", "")).strip(),
+    str(st.secrets.get("GEMINI_API_KEY_2", "")).strip(),
+    str(st.secrets.get("GEMINI_API_KEY", "")).strip(),
+]
+GEMINI_KEYS = [k for k in GEMINI_KEYS if k]
 
 YOUTUBE_KEY = str(st.secrets.get("YOUTUBE_API_KEY", "")).strip()
 SHEET_API = str(st.secrets.get("GOOGLE_SHEET_API", "")).strip()
@@ -38,159 +43,142 @@ TEMP_DOMAINS = {
     "getnada.com", "temp-mail.org", "dispostable.com", "maildrop.cc"
 }
 
-# --- ALL 22 CONSTITUTIONAL INDIAN LANGUAGES + BHOJPURI + GLOBAL (STRICTLY A-Z SORTED) ---
-LANGUAGES_LIST = [
+# --- 3. ALL 22 OFFICIAL INDIAN LANGUAGES + BHOJPURI (STRICTLY A-Z) ---
+INDIAN_LANGUAGES = [
     "Auto-Detect Video Language",
     "Assamese (অসমীয়া)",
     "Bengali (বাংলা)",
     "Bhojpuri (भोजपुरी)",
-    "Bodo (बर')",
+    "Bodo (बड़ो)",
     "Dogri (डोगरी)",
     "English",
     "Gujarati (ગુજરાતી)",
     "Hindi (हिन्दी)",
     "Hinglish (Hindi + English)",
     "Kannada (ಕನ್ನಡ)",
-    "Kashmiri (कॉशुर / كٲشُر)",
+    "Kashmiri (कश्मीरी)",
     "Konkani (कोंकणी)",
     "Maithili (मैथिली)",
     "Malayalam (മലയാളം)",
-    "Manipuri / Meitei (ꯃꯩꯇꯩꯂꯣꯟ)",
+    "Manipuri (মৈতৈলোন্)",
     "Marathi (मराठी)",
     "Nepali (नेपाली)",
     "Odia (ଓଡ଼ିଆ)",
     "Punjabi (ਪੰਜਾਬੀ)",
     "Sanskrit (संस्कृतम्)",
     "Santali (ᱥᱟᱱᱛᱟᱲᱤ)",
-    "Sindhi (सिन्धी / سنڌي)",
+    "Sindhi (سنڌي)",
     "Tamil (தமிழ்)",
     "Telugu (తెలుగు)",
     "Tenglish (Telugu + English)",
     "Urdu (اردو)"
 ]
 
-# --- 3. CUSTOM STYLING (100% CLEAN ENGLISH UI, NO TOP RIGHT ICONS, COMPACT SIDEBAR) ---
+# --- 4. CUSTOM DARK UI & CLEAN LAYOUT ---
 st.markdown("""
 <style>
-    /* Hide right-side toolbar icons (Share, Star, Edit, GitHub) while keeping left sidebar toggle button */
-    [data-testid="stToolbarActions"], .stAppDeployButton, #MainMenu, footer {
-        visibility: hidden !important;
+    /* Hide right-top Share/Star/Edit/GitHub icons while keeping Sidebar Open/Close button */
+    [data-testid="stToolbarActions"], .stDeployButton, #MainMenu, footer {
         display: none !important;
     }
-    header[data-testid="stHeader"] {
-        background: transparent !important;
-        height: 2.2rem !important;
+    [data-testid="stSidebarCollapsedControl"] {
+        display: flex !important;
+        visibility: visible !important;
     }
     .block-container {
-        padding-top: 0.6rem !important;
-        padding-bottom: 0.8rem !important;
-        max-width: 1220px !important;
+        padding-top: 1.1rem !important;
+        padding-bottom: 1.5rem !important;
+        max-width: 1180px !important;
     }
-    /* Compact no-scroll sidebar */
-    section[data-testid="stSidebar"] > div:first-child {
-        padding-top: 0.6rem !important;
-        padding-bottom: 0.4rem !important;
+    /* Compact No-Scroll Sidebar */
+    section[data-testid="stSidebar"] .block-container {
+        padding-top: 0.7rem !important;
+        padding-bottom: 0.5rem !important;
     }
-    section[data-testid="stSidebar"] .stMarkdown p {
+    section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h3 {
+        margin-top: 0.25rem !important;
         margin-bottom: 0.25rem !important;
-        font-size: 0.86rem !important;
+        font-size: 1.02rem !important;
     }
     section[data-testid="stSidebar"] hr {
         margin: 0.45rem 0 !important;
     }
-    /* Centered Brand Header */
-    .brand-banner {
-        background: linear-gradient(135deg, #0b132b 0%, #1c2541 100%);
-        border: 1px solid #334155;
-        border-bottom: 3px solid #10b981;
-        border-radius: 12px;
-        padding: 12px 20px;
-        margin-bottom: 10px;
+    /* Center Logo Header */
+    .center-header {
+        background: linear-gradient(135deg, #0b1324 0%, #162238 100%);
+        border: 1px solid #26354f;
+        border-radius: 14px;
+        padding: 14px 20px;
         text-align: center;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.28);
     }
-    .brand-title-row {
+    .header-title-row {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 12px;
+        gap: 10px;
     }
-    .brand-title-row img {
-        height: 40px;
-        width: 40px;
-        border-radius: 8px;
-        object-fit: contain;
-    }
-    .brand-title-row h1 {
-        margin: 0 !important;
-        padding: 0 !important;
-        font-size: 1.7rem !important;
-        font-weight: 800 !important;
-        color: #ffffff !important;
-        letter-spacing: -0.3px;
+    .header-title-row h1 {
+        margin: 0;
+        font-size: 1.65rem;
+        font-weight: 800;
+        color: #ffffff;
+        letter-spacing: 0.3px;
     }
     .india-badge {
         background: rgba(16, 185, 129, 0.16);
         border: 1px solid #10b981;
         color: #34d399;
         padding: 2px 10px;
-        border-radius: 20px;
-        font-size: 0.78rem;
+        border-radius: 999px;
+        font-size: 0.76rem;
         font-weight: 700;
     }
-    .brand-subtitle {
-        margin: 4px 0 0 0 !important;
-        color: #cbd5e1 !important;
-        font-size: 0.9rem !important;
-        text-align: center;
-    }
-    /* Compact Login & Status Strip */
-    .status-strip {
-        background: #111827;
-        border: 1px solid #374151;
-        border-radius: 10px;
-        padding: 8px 14px;
-        margin-bottom: 10px;
-        color: #e5e7eb;
+    .center-header p {
+        margin: 4px 0 0 0;
+        color: #cbd5e1;
         font-size: 0.88rem;
     }
+    .user-strip {
+        background: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 10px;
+        padding: 8px 14px;
+        color: #e2e8f0;
+        font-size: 0.88rem;
+        margin-bottom: 10px;
+    }
     .loading-pill {
-        background: rgba(16, 185, 129, 0.15);
+        background: rgba(16, 185, 129, 0.14);
         border: 1px solid #10b981;
         color: #34d399;
-        padding: 8px 14px;
+        padding: 7px 14px;
         border-radius: 8px;
         font-weight: 600;
-        font-size: 0.9rem;
+        font-size: 0.88rem;
         display: inline-block;
         margin-bottom: 8px;
-    }
-    /* Equal alignment for horizontal buttons & inputs */
-    div[data-testid="stHorizontalBlock"] {
-        align-items: flex-end !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. SESSION STATE INITIALIZATION ---
-defaults = {
-    "verified_email": "",
-    "otp_code": "",
-    "otp_target": "",
-    "pro_unlocked": False,
-    "pro_label": "",
-    "yt_report": "",
-    "yt_vid_id": "",
-    "yt_stats": None,
-    "yt_lang_detected": "",
-    "ig_report": "",
-    "tt_report": "",
-    "local_used_fallback": 0
-}
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
+# --- 5. SESSION STATE ---
+for key, default in [
+    ("verified_email", ""),
+    ("otp_code", ""),
+    ("otp_target", ""),
+    ("pro_unlocked", False),
+    ("pro_label", ""),
+    ("yt_report", ""),
+    ("yt_vid_id", ""),
+    ("ig_report", ""),
+    ("tt_report", "")
+]:
+    if key not in st.session_state:
+        st.session_state[key] = default
 
-# --- 5. CHECK GOOGLE OAUTH LOGIN ---
+# --- 6. GOOGLE OAUTH & RAZORPAY AUTO-REDIRECT ---
 try:
     if hasattr(st, "user") and getattr(st.user, "is_logged_in", False):
         g_email = getattr(st.user, "email", "")
@@ -199,45 +187,35 @@ try:
 except Exception:
     pass
 
-# --- 6. GOOGLE SHEET HELPERS (NO-CACHE LIVE SYNC) ---
+# --- 7. GOOGLE SHEET HELPERS (NO-CACHE LIVE SYNC) ---
 def get_free_used_count(user_id):
-    if not user_id:
+    if not SHEET_API or not user_id:
         return 0
-    if not SHEET_API:
-        return st.session_state.local_used_fallback
     try:
         r = requests.get(
             SHEET_API,
-            params={"device": user_id, "_ts": str(int(time.time() * 1000))},
+            params={"device": user_id, "_ts": int(time.time() * 1000)},
             timeout=10,
             allow_redirects=True
         )
-        if r.status_code == 200:
-            txt = r.text.strip()
-            if txt.isdigit():
-                val = min(3, int(txt))
-                st.session_state.local_used_fallback = max(st.session_state.local_used_fallback, val)
-                return st.session_state.local_used_fallback
+        if r.status_code == 200 and r.text.strip().isdigit():
+            return min(3, int(r.text.strip()))
     except Exception:
         pass
-    return st.session_state.local_used_fallback
+    return 0
 
 def increment_free_used(user_id):
-    if not user_id:
-        return
-    st.session_state.local_used_fallback = min(3, st.session_state.local_used_fallback + 1)
-    if not SHEET_API:
+    if not SHEET_API or not user_id:
         return
     for _ in range(2):
         try:
             r = requests.get(
                 SHEET_API,
-                params={"device": user_id, "inc": "1", "_ts": str(int(time.time() * 1000))},
+                params={"device": user_id, "inc": "1", "_ts": int(time.time() * 1000)},
                 timeout=10,
                 allow_redirects=True
             )
-            if r.status_code == 200 and r.text.strip().isdigit():
-                st.session_state.local_used_fallback = min(3, int(r.text.strip()))
+            if r.status_code == 200:
                 break
         except Exception:
             time.sleep(0.4)
@@ -253,7 +231,7 @@ def log_usage_to_sheet(user_id, platform, url):
                 "device": user_id,
                 "platform": platform,
                 "url": url,
-                "_ts": str(int(time.time() * 1000))
+                "_ts": int(time.time() * 1000)
             },
             timeout=8,
             allow_redirects=True
@@ -272,7 +250,7 @@ def verify_payment_id(pid, plan="1m"):
     try:
         r = requests.get(
             SHEET_API,
-            params={"pid": pid, "plan": plan, "_ts": str(int(time.time() * 1000))},
+            params={"pid": pid, "plan": plan, "_ts": int(time.time() * 1000)},
             timeout=10,
             allow_redirects=True
         )
@@ -284,32 +262,26 @@ def verify_payment_id(pid, plan="1m"):
         pass
     return "ERROR"
 
-# --- 7. AUTO-CHECK RAZORPAY REDIRECT URL PARAM ---
-try:
-    qp = st.query_params
-    auto_pid = qp.get("razorpay_payment_id", "") or qp.get("payment_id", "")
-    if auto_pid and not st.session_state.pro_unlocked:
-        st_res = verify_payment_id(auto_pid, plan="1m")
-        if st_res in ["VALID", "OWNER"]:
+if not st.session_state.pro_unlocked:
+    qp_pid = st.query_params.get("razorpay_payment_id", "")
+    if qp_pid and str(qp_pid).startswith("pay_"):
+        if verify_payment_id(str(qp_pid), "1m") == "VALID":
             st.session_state.pro_unlocked = True
             st.session_state.pro_label = "PRO UNLIMITED ACTIVE"
-            st.query_params.clear()
-except Exception:
-    pass
 
 def send_otp_email(to_email, code):
     if not SENDER_EMAIL or not SENDER_PASS:
-        return False, "SMTP email credentials missing in Secrets."
+        return False, "SMTP credentials not configured in Secrets."
     try:
         msg = MIMEText(
-            f"Welcome to TrendSutra AI (1 AI • 1 India)!\n\n"
+            f"Welcome to TrendSutra AI!\n\n"
             f"Your 6-digit verification code is: {code}\n\n"
-            f"Enter this code on TrendSutra AI to unlock your 3 Free Growth Reports."
+            f"Enter this code on TrendSutra AI to unlock your 3 Free Growth Reports.\n"
+            f"Do not share this OTP with anyone."
         )
         msg["Subject"] = f"{code} is your TrendSutra AI Verification Code"
         msg["From"] = f"TrendSutra AI <{SENDER_EMAIL}>"
         msg["To"] = to_email
-
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=12) as server:
             server.login(SENDER_EMAIL, SENDER_PASS)
             server.sendmail(SENDER_EMAIL, [to_email], msg.as_string())
@@ -359,7 +331,6 @@ def fetch_youtube_details(video_id):
             "title": snip.get("title", ""),
             "channel": snip.get("channelTitle", ""),
             "channel_id": snip.get("channelId", ""),
-            "default_audio_lang": snip.get("defaultAudioLanguage", "") or snip.get("defaultLanguage", ""),
             "description": snip.get("description", "")[:1200],
             "tags": snip.get("tags", [])[:20],
             "views": int(stats.get("viewCount", 0)),
@@ -370,7 +341,7 @@ def fetch_youtube_details(video_id):
     except Exception:
         return None
 
-# --- 9. GEMINI AI STREAMING (SINGLE-CALL UNIFIED LANGUAGE + REPORT + 4-KEY FAILOVER) ---
+# --- 9. 4-KEY SMART FAILOVER GEMINI STREAMING ---
 def get_best_models(client):
     preferred = [
         "gemini-2.5-flash",
@@ -394,12 +365,9 @@ def get_best_models(client):
         pass
     return preferred[:3]
 
-def clean_advisor_word(text):
-    return text.replace("మెంటర్", "సలహాదారు").replace("స్ట్రాటజిస్ట్", "సలహాదారు")
-
 def generate_report_stream(prompt):
     if not GEMINI_KEYS:
-        raise RuntimeError("No Gemini API keys configured in Streamlit Secrets.")
+        raise RuntimeError("Gemini API Keys not configured in Secrets.")
     last_err = ""
     for api_key in GEMINI_KEYS:
         try:
@@ -411,7 +379,7 @@ def generate_report_stream(prompt):
                         model=model_name,
                         contents=prompt,
                         config=types.GenerateContentConfig(
-                            temperature=0.80,
+                            temperature=0.8,
                             max_output_tokens=8192
                         )
                     )
@@ -419,7 +387,7 @@ def generate_report_stream(prompt):
                     for chunk in response:
                         if chunk.text:
                             yielded_any = True
-                            yield clean_advisor_word(chunk.text)
+                            yield chunk.text
                     if yielded_any:
                         return
                 except Exception as e:
@@ -428,38 +396,41 @@ def generate_report_stream(prompt):
         except Exception as e:
             last_err = str(e)
             continue
-    raise RuntimeError(f"AI servers are busy right now. Please try again in 5 seconds. ({last_err})")
+    raise RuntimeError(f"AI servers are currently busy. Please try again in 5 seconds. ({last_err})")
 
-# --- 10. CENTERED HEADER WITH LOGO ---
+# --- 10. CENTER HEADER WITH LOGO ---
 logo_html = ""
 if os.path.exists("logo.png"):
-    with open("logo.png", "rb") as f:
-        b64_logo = base64.b64encode(f.read()).decode()
-    logo_html = f'<img src="data:image/png;base64,{b64_logo}" alt="Logo">'
+    try:
+        with open("logo.png", "rb") as f:
+            b64_logo = base64.b64encode(f.read()).decode()
+        logo_html = f'<img src="data:image/png;base64,{b64_logo}" style="width:36px; height:36px; border-radius:8px; object-fit:contain;" />'
+    except Exception:
+        pass
 
 st.markdown(f"""
-<div class="brand-banner">
-    <div class="brand-title-row">
+<div class="center-header">
+    <div class="header-title-row">
         {logo_html}
         <h1>TrendSutra AI</h1>
         <span class="india-badge">🇮🇳 1 AI • 1 India</span>
     </div>
-    <p class="brand-subtitle">A to Z Growth Analyzer in All 22 Indian Languages + Bhojpuri for YouTube, Instagram & TikTok</p>
+    <p>A to Z Growth Analyzer in All 22 Indian Languages + Bhojpuri for YouTube, Instagram & TikTok</p>
 </div>
 """, unsafe_allow_html=True)
 
-# --- 11. COMPACT SIDEBAR (NO SCROLL, 100% ENGLISH UI) ---
+# --- 11. NO-SCROLL SIDEBAR (100% ENGLISH UI) ---
 with st.sidebar:
-    st.markdown("### ⚙️ Settings")
+    st.subheader("⚙️ Settings")
     report_lang = st.selectbox(
-        "🔍 Type to Search Language (A–Z):",
-        LANGUAGES_LIST,
+        "Type to Search Language (A–Z):",
+        INDIAN_LANGUAGES,
         index=0
     )
-    audience_scope = st.radio("Target Audience:", ["Regional", "Global", "Both"], horizontal=True)
+    audience_scope = st.radio("Target Audience:", ["Regional", "Global", "Both"], horizontal=True, label_visibility="collapsed")
 
     st.divider()
-    st.markdown("### 💎 Pro Plans")
+    st.subheader("💎 Pro Plans")
 
     free_used = get_free_used_count(st.session_state.verified_email) if st.session_state.verified_email else 0
     free_left = max(0, 3 - free_used)
@@ -470,9 +441,9 @@ with st.sidebar:
         if free_left > 0:
             st.info(f"🎁 Free Trial: **{free_left}/3 left**")
         else:
-            st.error("🔒 0/3 Free Reports Left")
+            st.error("🔒 Free Trial: **0/3 left**")
     else:
-        st.info("🎁 Login for **3 Free Reports**")
+        st.info("🎁 Login to get **3 Free Reports**")
 
     st.markdown(f"• **1 Month:** ₹100 👉 [Pay ₹100]({RAZORPAY_1M})")
     st.markdown(f"• **12 Months:** ₹1,000 👉 [Pay ₹1,000]({RAZORPAY_12M})")
@@ -481,32 +452,31 @@ with st.sidebar:
     pay_input = st.text_input("Payment ID:", placeholder="Paste Payment ID (pay_...)", label_visibility="collapsed")
     if st.button("Unlock Pro 🔓", use_container_width=True):
         if not pay_input.strip():
-            st.warning("Enter your Payment ID.")
+            st.warning("Please enter your Payment ID.")
         else:
-            p_code = "12m" if "12M" in plan_choice else "1m"
+            p_code = "12m" if "12" in plan_choice else "1m"
             status = verify_payment_id(pay_input, plan=p_code)
             if status == "OWNER":
                 st.session_state.pro_unlocked = True
-                st.session_state.pro_label = "OWNER UNLIMITED"
+                st.session_state.pro_label = "OWNER UNLIMITED ACTIVE"
                 st.rerun()
             elif status == "VALID":
                 st.session_state.pro_unlocked = True
-                st.session_state.pro_label = f"PRO ({plan_choice})"
+                st.session_state.pro_label = f"PRO ACTIVE ({plan_choice})"
                 st.rerun()
             elif status == "EXPIRED":
-                st.error("⏰ Plan expired! Please renew.")
+                st.error("⏰ Plan expired! Please renew your subscription.")
             elif status == "ALREADY_USED":
-                st.error("❌ Used on 3 devices already.")
+                st.error("❌ This Payment ID has already been used on 3 devices.")
             else:
-                st.error("❌ Invalid Payment ID.")
+                st.error("❌ Invalid Payment ID (must start with pay_).")
 
     st.divider()
     st.caption("📩 support@aiengtel.com | aiengtel.com")
 
-# --- 12. SINGLE-ROW COMPACT LOGIN BAR OR USER STATUS BAR ---
+# --- 12. SINGLE-ROW LOGIN BAR OR ACTIVE USER STRIP (100% ENGLISH UI) ---
 if not st.session_state.verified_email and not st.session_state.pro_unlocked:
-    st.markdown('<div class="status-strip">🔐 <b>Sign in to get 3 Free Growth Reports</b> (Choose Google 1-Click or Email OTP):</div>', unsafe_allow_html=True)
-    lc1, lc2, lc3, lc4 = st.columns([2.2, 0.5, 2.5, 1.5])
+    lc1, lc2, lc3, lc4 = st.columns([1.6, 0.35, 1.8, 1.1])
     with lc1:
         if st.button("🔵 Continue with Gmail", type="primary", use_container_width=True):
             try:
@@ -514,32 +484,30 @@ if not st.session_state.verified_email and not st.session_state.pro_unlocked:
             except Exception as e:
                 st.error(f"Google Login error: {e}")
     with lc2:
-        st.markdown("<div style='text-align:center; padding-bottom:8px; color:#94a3b8; font-weight:700;'>OR</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center; padding-top:7px; color:#94a3b8; font-weight:700;'>OR</div>", unsafe_allow_html=True)
     with lc3:
-        email_in = st.text_input("Email", placeholder="Login with Mail ID (e.g. name@gmail.com)", label_visibility="collapsed")
+        email_in = st.text_input("Mail ID", placeholder="Login with Mail ID (Enter Email)", label_visibility="collapsed")
     with lc4:
-        send_otp_btn = st.button("Send OTP 📩", use_container_width=True)
-
-    if send_otp_btn:
-        clean_em = email_in.strip().lower()
-        if "@" not in clean_em or "." not in clean_em.split("@")[-1]:
-            st.error("❌ Please enter a valid Email ID.")
-        elif clean_em.split("@")[-1] in TEMP_DOMAINS:
-            st.error("❌ Temporary email domains are not allowed.")
-        else:
-            code = str(random.randint(100000, 999999))
-            ok, err_msg = send_otp_email(clean_em, code)
-            if ok:
-                st.session_state.otp_code = code
-                st.session_state.otp_target = clean_em
-                st.success(f"✅ 6-digit OTP sent to {clean_em}! Check your inbox or spam folder.")
+        if st.button("Send OTP 📩", use_container_width=True):
+            clean_em = email_in.strip().lower()
+            if "@" not in clean_em or "." not in clean_em.split("@")[-1]:
+                st.error("❌ Please enter a valid Email ID.")
+            elif clean_em.split("@")[-1] in TEMP_DOMAINS:
+                st.error("❌ Temporary emails are not allowed.")
             else:
-                st.error(f"OTP Error: {err_msg}")
+                code = str(random.randint(100000, 999999))
+                ok, err_msg = send_otp_email(clean_em, code)
+                if ok:
+                    st.session_state.otp_code = code
+                    st.session_state.otp_target = clean_em
+                    st.success(f"✅ 6-digit OTP sent to {clean_em}! Please check Inbox/Spam.")
+                else:
+                    st.error(f"❌ Failed to send OTP: {err_msg}")
 
     if st.session_state.otp_target:
-        oc1, oc2 = st.columns([3, 1.5])
+        oc1, oc2 = st.columns([2.2, 1.2])
         with oc1:
-            otp_in = st.text_input("OTP", placeholder=f"Enter 6-digit OTP sent to {st.session_state.otp_target}", max_chars=6, label_visibility="collapsed")
+            otp_in = st.text_input("Enter OTP", placeholder=f"Enter 6-digit OTP sent to {st.session_state.otp_target}", max_chars=6, label_visibility="collapsed")
         with oc2:
             if st.button("Verify OTP ✅", type="primary", use_container_width=True):
                 if otp_in.strip() == st.session_state.otp_code:
@@ -547,20 +515,18 @@ if not st.session_state.verified_email and not st.session_state.pro_unlocked:
                     st.session_state.otp_code = ""
                     st.rerun()
                 else:
-                    st.error("❌ Incorrect OTP. Please try again.")
-    st.stop()
+                    st.error("❌ Incorrect OTP! Please check and try again.")
 else:
-    ub1, ub2 = st.columns([5, 1.2])
-    with ub1:
-        badge_txt = f"👑 {st.session_state.pro_label}" if st.session_state.pro_unlocked else f"🎁 {free_left}/3 Free Reports Left"
-        st.markdown(f'<div class="status-strip">👤 Logged in as <b>{st.session_state.verified_email or "Pro User"}</b> &nbsp;|&nbsp; {badge_txt}</div>', unsafe_allow_html=True)
-    with ub2:
+    uc1, uc2 = st.columns([4, 1])
+    with uc1:
+        badge_txt = f"✅ {st.session_state.pro_label}" if st.session_state.pro_unlocked else f"🎁 {free_left}/3 Free Reports Left"
+        who_txt = st.session_state.verified_email if st.session_state.verified_email else "Pro Member"
+        st.markdown(f'<div class="user-strip">👤 Logged in as <b>{who_txt}</b> &nbsp;|&nbsp; {badge_txt}</div>', unsafe_allow_html=True)
+    with uc2:
         if st.button("Logout 🚪", use_container_width=True):
             st.session_state.verified_email = ""
             st.session_state.pro_unlocked = False
             st.session_state.yt_report = ""
-            st.session_state.ig_report = ""
-            st.session_state.tt_report = ""
             try:
                 if hasattr(st, "logout"):
                     st.logout()
@@ -568,98 +534,86 @@ else:
                 pass
             st.rerun()
 
-# --- 13. HELPER FOR SINGLE-PASS UNIFIED LANGUAGE INSTRUCTION ---
-def build_language_directive(selected_lang):
-    if selected_lang.startswith("Auto-Detect"):
-        return """
-LANGUAGE RULE (SINGLE-PASS AUTO-DETECT & NATIVE SCRIPT):
-1. First, automatically detect the primary language of the video from its title, audio language tag, description, and audience comments.
-2. On the very first line of your output, write ONLY:
-   🌐 **Detected Video Language:** <Language Name>
-3. Then write the ENTIRE 6-section report (including all 6 section headings and every paragraph) in that detected language using its **authentic native script** (e.g. Telugu in తెలుగు script, Tamil in தமிழ் script, Hindi in हिन्दी Devanagari script, Urdu in اردو script, Kannada in ಕನ್ನಡ script, Malayalam in മലയാളം script, Bengali in বাংলা script, Marathi in मराठी script, Gujarati in ગુજરાતી script, Punjabi in ਪੰਜਾਬੀ script, etc. Do NOT write Indian languages in Roman/English letters unless Hinglish or Tenglish is detected).
-"""
-    else:
-        return f"""
-LANGUAGE RULE (NATIVE SCRIPT REQUIRED):
-Write the ENTIRE 6-section report (including all 6 section headings and every paragraph) in **{selected_lang}** using its **authentic native script** (for example: Telugu in తెలుగు script, Tamil in தமிழ் script, Hindi in हिन्दी script, Urdu in اردو script, Kannada in ಕನ್ನಡ script, Malayalam in മലയാളം script, Bengali in বাংলা script, Marathi in मराठी script, Gujarati in ગુજરાતી script, Punjabi in ਪੰਜਾਬੀ script, Odia in ଓଡ଼ିଆ script, Assamese in অসমীয়া script, Bhojpuri in भोजपुरी script, etc.). Do NOT write in Roman/English letters unless English, Hinglish, or Tenglish is selected.
-"""
+# --- 13. MAIN ANALYZER TABS (100% ENGLISH UI + NATIVE SCRIPT REPORT) ---
+is_auto_lang = report_lang.startswith("Auto-Detect")
+lang_instruction = (
+    "Automatically detect the primary language of the video from its title, description, tags, and comments. "
+    "First output a single line at the very top: `🌐 Detected Video Language: <Language Name>` and then write the ENTIRE 6-section report (including all 6 headings) in that detected language's native script (for example, Telugu in తెలుగు, Tamil in தமிழ், Hindi in हिन्दी, Urdu in اردو, Kannada in ಕನ್ನಡ, etc.)."
+    if is_auto_lang else
+    f"Write the ENTIRE 6-section report (including all 6 section headings) strictly in **{report_lang}** using its native script."
+)
 
-# --- 14. MAIN WORKSPACE TABS ---
 tab_yt, tab_ig, tab_tt = st.tabs(["📺 YouTube Analyzer", "📸 Instagram Reels Analyzer", "🎵 TikTok Analyzer"])
 
 with tab_yt:
-    yc1, yc2 = st.columns([4.2, 1.5])
+    yc1, yc2 = st.columns([3.4, 1.3])
     with yc1:
-        yt_url = st.text_input("YT Link", placeholder="Paste YouTube Video or Shorts Link (https://youtube.com/...)", label_visibility="collapsed")
+        yt_url = st.text_input("YouTube URL", placeholder="Paste YouTube Video or Shorts Link (https://youtube.com/...)", label_visibility="collapsed")
     with yc2:
         run_yt = st.button("Generate Growth Report 🔍", key="btn_yt", type="primary", use_container_width=True)
 
     yt_status_slot = st.empty()
 
     if run_yt:
-        if not yt_url.strip():
-            st.warning("Please paste a YouTube video or Shorts link.")
+        if not st.session_state.verified_email and not st.session_state.pro_unlocked:
+            st.warning("⚠️ Please login with Gmail or Email OTP above to generate your free report.")
+        elif not yt_url.strip():
+            st.warning("⚠️ Please paste a YouTube video or Shorts link.")
         elif not st.session_state.pro_unlocked and free_left <= 0:
-            st.error("🔒 You have used all 3 Free Reports! Please upgrade to a Pro Plan on the left sidebar for unlimited access.")
+            st.error("🔒 Your 3 Free Reports are finished! Please upgrade to a Pro Plan on the left sidebar.")
         else:
             vid_id = extract_youtube_id(yt_url.strip())
             if not vid_id:
-                st.error("❌ Invalid YouTube link. Please enter a valid Video or Shorts URL.")
+                st.error("❌ Please enter a valid YouTube Video or Shorts link.")
             else:
                 yt_status_slot.markdown('<div class="loading-pill">🔄 Fetching video details & audience comments... ⏳</div>', unsafe_allow_html=True)
                 data = fetch_youtube_details(vid_id)
                 if not data:
                     yt_status_slot.empty()
-                    st.error("❌ Could not fetch video details. Make sure the video is Public.")
+                    st.error("❌ Could not fetch video details. Please make sure the video is Public.")
                 else:
-                    st.session_state.yt_stats = data
-                    st.session_state.yt_vid_id = vid_id
+                    m1, m2, m3 = st.columns(3)
+                    m1.metric("👀 Views", f"{data['views']:,}")
+                    m2.metric("👍 Likes", f"{data['likes']:,}")
+                    m3.metric("💬 Comments", f"{data['comment_count']:,}")
 
                     comments_block = "\n".join(data["comments"][:15]) if data["comments"] else "No public comments available."
-                    lang_rule = build_language_directive(report_lang)
-
                     prompt = f"""
-You are a warm, encouraging, expert human social media growth advisor ("సలహాదారు" / "सलाहकार").
-Write a deeply detailed, simple, easy-to-understand growth audit report (1,100 to 1,500 words) tailored for a **{audience_scope}** audience.
-Use natural, everyday spoken words that any creator can easily understand. Never use complex academic words.
-{lang_rule}
+You are a warm, encouraging, expert human social media growth advisor.
+{lang_instruction}
+Target audience scope: **{audience_scope}**.
+Write a deeply detailed, practical, easy-to-understand growth audit report (1,100 to 1,500 words) using simple everyday spoken words so any creator can easily apply it.
 
 VIDEO DATA:
 - Channel: {data['channel']}
 - Title: {data['title']}
-- Audio/Metadata Language Hint: {data['default_audio_lang']}
 - Views: {data['views']:,} | Likes: {data['likes']:,} | Comments: {data['comment_count']:,}
 - Description: {data['description']}
 - Tags: {', '.join(data['tags'])}
 - Real Audience Comments:
 {comments_block}
 
-STRICTLY FOLLOW THIS 6-SECTION STRUCTURE (Translate all 6 headings into the target native script):
+STRICTLY FOLLOW THIS 6-SECTION STRUCTURE (translate all 6 headings into the target language's native script):
 ### 🎬 1. Video Story Recap & Creator Appreciation
 - First, warmly retell the core story/message of this video based on its title, description, and comments so the creator feels you truly watched and understood their hard work.
-- Then genuinely praise the creator's effort, topic choice, and strengths with motivating words.
+- Then genuinely praise the creator's effort, topic choice, and presentation.
 
-### 💬 2. What Your Audience Is Saying (Real Comments Translated & Reply Templates)
-- Pick 4 to 5 real viewer comments from the list above, translate them naturally into the target language native script, quote them with the viewer's name, explain what viewers love or ask for, and give 3 ready-to-copy reply templates to boost engagement.
+### 💬 2. Audience Comments Translated & Reply Guide
+- Pick 4 to 5 real viewer comments from the list above, translate them naturally into the target language, quote them with the viewer's name, explain what viewers love or ask for, and provide 3 ready-to-copy reply templates.
 
-### 🔥 3. Next 3 Viral Video Ideas + Word-for-Word 5-Second Hooks
-- Give 3 high-potential follow-up video ideas tailored to this channel. For each idea, write an exact word-for-word **5-second opening Hook** and a **Thumbnail visual idea**.
+### 🔥 3. 3 Next Viral Video Ideas + 5-Second Hooks
+- Give 3 fresh follow-up video ideas tailored to this channel. For each idea, write an exact word-for-word **5-second opening Hook** and a **Thumbnail visual idea**.
 
-### 🎯 4. Copy-Paste SEO Makeover (High-CTR Titles, Description & 15 Tags)
+### 🎯 4. Copy-Paste SEO Makeover (Titles, Description & 15 Tags)
 - Provide 3 clickable high-CTR title options, a strong 3-line SEO description hook, and 15 searchable comma-separated tags.
 
 ### 💰 5. Monetization & Earning Blueprint
-- Explain 3 practical ways this specific channel can earn money (AdSense, Affiliate marketing, Brand sponsorships) with realistic examples.
+- Explain 3 practical ways this channel can earn money (AdSense, Affiliate links, Brand sponsorships).
 
-### 📅 6. 30-Day Step-by-Step Growth Action Plan
+### 📅 6. 30-Day Step-by-Step Action Plan
 - Give a clear Week 1 to Week 4 checklist of simple daily/weekly actions to double views and subscribers.
 """
                     yt_status_slot.markdown('<div class="loading-pill">⚡ Generating Growth Report... ⏳</div>', unsafe_allow_html=True)
-                    m1, m2, m3 = st.columns(3)
-                    m1.metric("👀 Views", f"{data['views']:,}")
-                    m2.metric("👍 Likes", f"{data['likes']:,}")
-                    m3.metric("💬 Comments", f"{data['comment_count']:,}")
-
                     report_box = st.empty()
                     full_text = ""
                     try:
@@ -668,6 +622,7 @@ STRICTLY FOLLOW THIS 6-SECTION STRUCTURE (Translate all 6 headings into the targ
                             report_box.markdown(full_text)
                         yt_status_slot.empty()
                         st.session_state.yt_report = full_text
+                        st.session_state.yt_vid_id = vid_id
                         if not st.session_state.pro_unlocked:
                             increment_free_used(st.session_state.verified_email)
                         log_usage_to_sheet(st.session_state.verified_email or "PRO", "YouTube", yt_url.strip())
@@ -676,47 +631,42 @@ STRICTLY FOLLOW THIS 6-SECTION STRUCTURE (Translate all 6 headings into the targ
                         yt_status_slot.empty()
                         st.error(str(e))
 
-    # Persist YouTube report across reruns & downloads (never goes blank!)
-    if st.session_state.yt_report and not run_yt:
-        if st.session_state.yt_stats:
-            d = st.session_state.yt_stats
-            m1, m2, m3 = st.columns(3)
-            m1.metric("👀 Views", f"{d['views']:,}")
-            m2.metric("👍 Likes", f"{d['likes']:,}")
-            m3.metric("💬 Comments", f"{d['comment_count']:,}")
+    if st.session_state.yt_report:
         st.markdown(st.session_state.yt_report)
-        st.success("✅ Growth Audit Report is ready!")
+        st.success("✅ Growth Audit Report Ready!")
         st.download_button(
             "📥 Download Complete Growth Report (.txt)",
             data=st.session_state.yt_report,
-            file_name=f"TrendSutra_YouTube_Report_{st.session_state.yt_vid_id or 'Audit'}.txt",
+            file_name=f"TrendSutra_YouTube_Report_{st.session_state.yt_vid_id or 'Report'}.txt",
             mime="text/plain",
             use_container_width=True
         )
 
 with tab_ig:
-    ic1, ic2 = st.columns([4.2, 1.5])
+    ic1, ic2 = st.columns([3.4, 1.3])
     with ic1:
-        ig_url = st.text_input("IG Link", placeholder="Paste Instagram Reel Link (https://www.instagram.com/reel/...)", label_visibility="collapsed")
+        ig_url = st.text_input("Instagram URL", placeholder="Paste Instagram Reel Link (https://instagram.com/reel/...)", label_visibility="collapsed")
     with ic2:
         run_ig = st.button("Generate Growth Report 🔍", key="btn_ig", type="primary", use_container_width=True)
 
     ig_status_slot = st.empty()
 
     if run_ig:
-        if not ig_url.strip():
-            st.warning("Please paste an Instagram Reel link.")
+        if not st.session_state.verified_email and not st.session_state.pro_unlocked:
+            st.warning("⚠️ Please login with Gmail or Email OTP above to generate your free report.")
+        elif not ig_url.strip():
+            st.warning("⚠️ Please paste an Instagram Reel link.")
         elif not st.session_state.pro_unlocked and free_left <= 0:
-            st.error("🔒 You have used all 3 Free Reports! Please upgrade to a Pro Plan on the left sidebar.")
+            st.error("🔒 Your 3 Free Reports are finished! Please upgrade to a Pro Plan on the left sidebar.")
         else:
             ig_status_slot.markdown('<div class="loading-pill">⚡ Generating Instagram Growth Report... ⏳</div>', unsafe_allow_html=True)
-            lang_rule = build_language_directive(report_lang)
             ig_prompt = f"""
 You are a warm, encouraging human Instagram Reels growth advisor.
-Write a detailed 6-section Instagram Reels growth audit (1,000+ words) for a **{audience_scope}** audience using simple spoken words.
-{lang_rule}
+{lang_instruction}
+Target audience scope: **{audience_scope}**.
+Write a detailed 6-section Instagram Reels growth audit (1,000+ words) in simple spoken words.
 Reel Link: {ig_url.strip()}
-Include (translate all 6 headings into the target native script):
+Include:
 1. Creator Appreciation & Reel Strategy Overview
 2. Watch-Time, Audio & Retention Hook Analysis
 3. 3 Viral Follow-Up Reel Ideas with word-for-word 3-second Hooks
@@ -740,9 +690,9 @@ Include (translate all 6 headings into the target native script):
                 ig_status_slot.empty()
                 st.error(str(e))
 
-    if st.session_state.ig_report and not run_ig:
+    if st.session_state.ig_report:
         st.markdown(st.session_state.ig_report)
-        st.success("✅ Instagram Growth Report is ready!")
+        st.success("✅ Instagram Growth Report Ready!")
         st.download_button(
             "📥 Download Instagram Report (.txt)",
             data=st.session_state.ig_report,
@@ -752,28 +702,30 @@ Include (translate all 6 headings into the target native script):
         )
 
 with tab_tt:
-    tc1, tc2 = st.columns([4.2, 1.5])
+    tc1, tc2 = st.columns([3.4, 1.3])
     with tc1:
-        tt_url = st.text_input("TT Link", placeholder="Paste TikTok Video Link (https://www.tiktok.com/@user/video/...)", label_visibility="collapsed")
+        tt_url = st.text_input("TikTok URL", placeholder="Paste TikTok Video Link (https://tiktok.com/@user/video/...)", label_visibility="collapsed")
     with tc2:
         run_tt = st.button("Generate Growth Report 🔍", key="btn_tt", type="primary", use_container_width=True)
 
     tt_status_slot = st.empty()
 
     if run_tt:
-        if not tt_url.strip():
-            st.warning("Please paste a TikTok video link.")
+        if not st.session_state.verified_email and not st.session_state.pro_unlocked:
+            st.warning("⚠️ Please login with Gmail or Email OTP above to generate your free report.")
+        elif not tt_url.strip():
+            st.warning("⚠️ Please paste a TikTok video link.")
         elif not st.session_state.pro_unlocked and free_left <= 0:
-            st.error("🔒 You have used all 3 Free Reports! Please upgrade to a Pro Plan on the left sidebar.")
+            st.error("🔒 Your 3 Free Reports are finished! Please upgrade to a Pro Plan on the left sidebar.")
         else:
             tt_status_slot.markdown('<div class="loading-pill">⚡ Generating TikTok Growth Report... ⏳</div>', unsafe_allow_html=True)
-            lang_rule = build_language_directive(report_lang)
             tt_prompt = f"""
 You are a warm, encouraging human TikTok growth advisor.
-Write a detailed 6-section TikTok growth audit (1,000+ words) for a **{audience_scope}** audience using simple spoken words.
-{lang_rule}
+{lang_instruction}
+Target audience scope: **{audience_scope}**.
+Write a detailed 6-section TikTok growth audit (1,000+ words) in simple spoken words.
 TikTok Link: {tt_url.strip()}
-Include (translate all 6 headings into the target native script):
+Include:
 1. Creator Appreciation & Viral Potential Overview
 2. Completion Rate & Looping Hook Formula
 3. 3 Viral Follow-Up TikTok Ideas with word-for-word 3-second Hooks
@@ -797,9 +749,9 @@ Include (translate all 6 headings into the target native script):
                 tt_status_slot.empty()
                 st.error(str(e))
 
-    if st.session_state.tt_report and not run_tt:
+    if st.session_state.tt_report:
         st.markdown(st.session_state.tt_report)
-        st.success("✅ TikTok Growth Report is ready!")
+        st.success("✅ TikTok Growth Report Ready!")
         st.download_button(
             "📥 Download TikTok Report (.txt)",
             data=st.session_state.tt_report,
